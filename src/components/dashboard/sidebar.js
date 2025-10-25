@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+
 import { 
   LayoutDashboard, 
   Users, 
@@ -11,6 +12,7 @@ import {
   Settings,
   FileText,
   CreditCard,
+  Building2,
   Bell,
   HelpCircle
 } from 'lucide-react';
@@ -35,9 +37,13 @@ const menuItems = [
   {
     label: 'School Management',
     items: [
-      { id: 'School Community', label: 'School Community', icon: FileText, href: '/dashboard/school-community' },
-      { id: 'Add School', label: 'Add School', icon: FileText, href: '/dashboard/add-school'},
-      { id: 'All Schools', label: 'All Schools', icon: FileText, href: '/dashboard/all-school'},
+      { id: 'School Groups', label: 'School Groups', icon: Building2, href: '/dashboard/school-groups' },
+      { id: 'School Posts', label: 'School Posts', icon: Building2, href: '/dashboard/school-posts'},
+      { id: 'Get School Details', label: 'Get School Post details', icon: Building2, href: '/dashboard/get-community'},
+      { id: 'Add School', label: 'Add School', icon: Building2, href: '/dashboard/add-school'},
+      
+      { id: 'All Schools', label: 'All Schools', icon: Building2, href: '/dashboard/all-school'},
+      
       { id: 'billing', label: 'Billing', icon: CreditCard, href: '/dashboard/billing' },
       { id: 'notifications', label: 'Notifications', icon: Bell, href: '/dashboard/notifications' },
       { id: 'settings', label: 'Settings', icon: Settings, href: '/dashboard/settings' },
