@@ -31,6 +31,7 @@ const getGroupsCount = async () => {
   }
 };
 
+
 const createGroup = async (formData) => {
   try {
     const response = await fetch(`${API_BASE_URL}/communityGroup/`, {
@@ -50,6 +51,8 @@ const createGroup = async (formData) => {
     return { success: false, error: 'Network error. Please try again.' };
   }
 };
+
+
 
 const updateGroup = async (groupId, formData) => {
   try {

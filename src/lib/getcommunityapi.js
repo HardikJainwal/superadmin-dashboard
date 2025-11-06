@@ -1,5 +1,5 @@
-// lib/postsService.js
 const API_BASE_URL = "http://69.62.74.102:3000/api/v1";
+const API_BASE_temp_URL = "http://localhost:3000/api/v1";
 
 const getHeaders = () => {
   const token = localStorage.getItem('token');
@@ -44,6 +44,70 @@ export const getAllSchools = async () => {
     };
   }
 };
+// Edit community post
+export const editCommunityPost = async (postId, formData) => {
+  try {
+    const token = localStorage.getItem('token');
+    const headers = {};
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const response = await fetch(`${API_BASE_temp_URL}/school/editCommunityPost/${postId}`, {
+      method: 'PUT',
+      headers: headers,
+      body: formData, // FormData object
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return {
+      success: true,
+      message: result.message || 'Post updated successfully',
+      data: result.post || result.data
+    };
+  } catch (error) {
+    console.error('Error editing post:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to edit post'
+    };
+  }
+};
+
+// Delete community post
+export const deleteCommunityPost = async (postId) => {
+  try {
+    const response = await fetch(`${API_BASE_temp_URL}/school/deleteCommunityPost/${postId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return {
+      success: true,
+      message: result.message || 'Post deleted successfully',
+      data: result
+    };
+  } catch (error) {
+    console.error('Error deleting post:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to delete post'
+    };
+  }
+};
+
 
 // Get posts by school ID
 export const getPostsBySchool = async (schoolId, page = 1) => {

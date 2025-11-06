@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useEffect } from 'react';
-import { School, Users, FileText, BarChart3, Image as ImageIcon, Calendar, TrendingUp, Eye, Filter, ChevronRight, Building2, Flame, ToggleLeft, ToggleRight, AlertCircle, Sparkles } from 'lucide-react';
-import { getAllSchools, getPostsBySchool, getPostsByGroup, getTrendingPosts, setPostTrending } from '@/lib/getcommunityapi';
+import { School, Users, FileText, BarChart3, Image as ImageIcon, Calendar, TrendingUp, Eye, Filter, ChevronRight, Building2, Flame, ToggleLeft, ToggleRight, AlertCircle, Sparkles, Edit, Trash2, X, Save } from 'lucide-react';
+import { getAllSchools, getPostsBySchool, getPostsByGroup, getTrendingPosts, setPostTrending, editCommunityPost, deleteCommunityPost } from '@/lib/getcommunityapi';
 import { getCommunityGroups } from '@/lib/communitypostapi';
 
 const ViewPosts = () => {
@@ -19,6 +19,14 @@ const ViewPosts = () => {
   const [togglingTrending, setTogglingTrending] = useState({});
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  
+  // Edit/Delete states
+  const [editingPost, setEditingPost] = useState(null);
+  const [editMessage, setEditMessage] = useState('');
+  const [editImages, setEditImages] = useState([]);
+  const [newImages, setNewImages] = useState([]);
+  const [deletingPost, setDeletingPost] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     fetchSchools();
@@ -86,7 +94,6 @@ const ViewPosts = () => {
     
     if (result.success) {
       setSuccessMessage(`Post trending status updated successfully!`);
-      // Update the post in the current list
       if (viewMode === 'trending') {
         fetchTrendingPosts();
       } else {
@@ -107,6 +114,116 @@ const ViewPosts = () => {
     setTogglingTrending(prev => ({ ...prev, [postId]: false }));
   };
 
+  // Edit Post Functions
+  const handleEditClick = (post) => {
+    setEditingPost(post._id);
+    setEditMessage(post.message || '');
+    setEditImages(post.images || []);
+    setNewImages([]);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingPost(null);
+    setEditMessage('');
+    setEditImages([]);
+    setNewImages([]);
+  };
+
+  const handleImageChange = (e) => {
+    const files = Array.from(e.target.files);
+    setNewImages(files);
+  };
+
+  const handleRemoveExistingImage = (index) => {
+    setEditImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveEdit = async (postId) => {
+    if (!editMessage.trim()) {
+      setErrorMessage('Post message cannot be empty');
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
+
+    setSavingEdit(true);
+    const formData = new FormData();
+    formData.append('message', editMessage);
+    
+    // Add existing images that weren't removed
+    editImages.forEach((img) => {
+      formData.append('existingImages', img);
+    });
+    
+    // Add new images
+    newImages.forEach((file) => {
+      formData.append('images', file);
+    });
+
+    const result = await editCommunityPost(postId, formData);
+    
+    if (result.success) {
+      setSuccessMessage('Post updated successfully!');
+      
+      // Update the post in the list
+      setPosts(prevPosts => 
+        prevPosts.map(post => 
+          post._id === postId 
+            ? { ...post, message: editMessage, images: result.data.images || editImages }
+            : post
+        )
+      );
+      
+      if (viewMode === 'trending') {
+        setTrendingPosts(prevPosts => 
+          prevPosts.map(post => 
+            post._id === postId 
+              ? { ...post, message: editMessage, images: result.data.images || editImages }
+              : post
+          )
+        );
+      }
+      
+      handleCancelEdit();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } else {
+      setErrorMessage(result.error || 'Failed to update post');
+      setTimeout(() => setErrorMessage(''), 3000);
+    }
+    
+    setSavingEdit(false);
+  };
+
+  // Delete Post Functions
+  const handleDeleteClick = (postId) => {
+    setDeletingPost(postId);
+  };
+
+  const handleCancelDelete = () => {
+    setDeletingPost(null);
+  };
+
+  const handleConfirmDelete = async (postId) => {
+    const result = await deleteCommunityPost(postId);
+    
+    if (result.success) {
+      setSuccessMessage('Post deleted successfully!');
+      
+      // Remove post from the list
+      setPosts(prevPosts => prevPosts.filter(post => post._id !== postId));
+      
+      if (viewMode === 'trending') {
+        setTrendingPosts(prevPosts => prevPosts.filter(post => post._id !== postId));
+      }
+      
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } else {
+      setErrorMessage(result.error || 'Failed to delete post');
+      setTimeout(() => setErrorMessage(''), 3000);
+    }
+    
+    setDeletingPost(null);
+  };
+
   const getReactionIcon = (reaction) => {
     switch (reaction) {
       case 'love': return '❤️';
@@ -117,163 +234,301 @@ const ViewPosts = () => {
     }
   };
 
-  const renderPostCard = (post, showTrendingToggle = true) => (
-    <div key={post._id} className="border-2 border-gray-200 rounded-xl p-5 hover:shadow-lg transition-all bg-white hover:border-indigo-300">
-      {/* Post Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 capitalize flex items-center gap-1.5">
-            {post.postType === 'text' && <FileText className="w-3.5 h-3.5" />}
-            {post.postType === 'poll' && <BarChart3 className="w-3.5 h-3.5" />}
-            {post.postType === 'image' && <ImageIcon className="w-3.5 h-3.5" />}
-            {post.postType}
-          </span>
-          {post.isTrending && (
-            <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-orange-100 text-orange-700 flex items-center gap-1">
-              <Flame className="w-3.5 h-3.5" />
-              Trending
+  const renderPostCard = (post, showTrendingToggle = true) => {
+    const isEditing = editingPost === post._id;
+    const isDeleting = deletingPost === post._id;
+
+    return (
+      <div key={post._id} className="border-2 border-gray-200 rounded-xl p-5 hover:shadow-lg transition-all bg-white hover:border-indigo-300 relative">
+        {/* Delete Confirmation Modal */}
+        {isDeleting && (
+          <div className="absolute inset-0 bg-white bg-opacity-95 rounded-xl flex items-center justify-center z-10 border-2 border-red-500">
+            <div className="text-center p-6">
+              <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Delete Post?</h3>
+              <p className="text-gray-600 mb-6">This action cannot be undone.</p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => handleConfirmDelete(post._id)}
+                  className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={handleCancelDelete}
+                  className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-400 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Post Header */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 capitalize flex items-center gap-1.5">
+              {post.postType === 'text' && <FileText className="w-3.5 h-3.5" />}
+              {post.postType === 'poll' && <BarChart3 className="w-3.5 h-3.5" />}
+              {post.postType === 'image' && <ImageIcon className="w-3.5 h-3.5" />}
+              {post.postType}
+            </span>
+            {post.isTrending && (
+              <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-orange-100 text-orange-700 flex items-center gap-1">
+                <Flame className="w-3.5 h-3.5" />
+                Trending
+              </span>
+            )}
+            {post.manuallyTrending?.isSet && (
+              <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-purple-100 text-purple-700 flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5" />
+                Manual
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5" />
+              {new Date(post.createdAt).toLocaleDateString()}
+            </span>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        {!isEditing && !isDeleting && (
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={() => handleEditClick(post)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all text-sm font-semibold"
+            >
+              <Edit className="w-4 h-4" />
+              Edit
+            </button>
+            <button
+              onClick={() => handleDeleteClick(post._id)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all text-sm font-semibold"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </button>
+          </div>
+        )}
+
+        {/* Trending Toggle */}
+        {showTrendingToggle && !isEditing && (
+          <div className="mb-3 flex items-center justify-between bg-gray-50 rounded-lg p-3 border border-gray-200">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-indigo-600" />
+              <span className="text-sm font-semibold text-gray-700">Set as Trending</span>
+            </div>
+            <button
+              onClick={() => handleToggleTrending(post._id, post.isTrending)}
+              disabled={togglingTrending[post._id]}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
+                post.isTrending
+                  ? 'bg-orange-500 text-white hover:bg-orange-600'
+                  : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+              } ${togglingTrending[post._id] ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {togglingTrending[post._id] ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  <span className="text-xs">Updating...</span>
+                </>
+              ) : (
+                <>
+                  {post.isTrending ? (
+                    <>
+                      <ToggleRight className="w-5 h-5" />
+                      <span className="text-xs">ON</span>
+                    </>
+                  ) : (
+                    <>
+                      <ToggleLeft className="w-5 h-5" />
+                      <span className="text-xs">OFF</span>
+                    </>
+                  )}
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* School/Group Info */}
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          {post.schoolId && (
+            <span className="text-xs bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-semibold flex items-center gap-1">
+              <Building2 className="w-3 h-3" />
+              {typeof post.schoolId === 'object' ? post.schoolId.name : post.school || 'School Post'}
             </span>
           )}
-          {post.manuallyTrending?.isSet && (
-            <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-purple-100 text-purple-700 flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5" />
-              Manual
+          {!post.schoolId && (
+            <span className="text-xs bg-green-50 text-green-700 px-3 py-1 rounded-full font-semibold">
+              🌍 {post.school || 'Global Post'}
+            </span>
+          )}
+          {post.trendingType && (
+            <span className="text-xs bg-purple-50 text-purple-700 px-3 py-1 rounded-full font-semibold">
+              {post.trendingType}
+            </span>
+          )}
+          {post.trendingScore !== undefined && (
+            <span className="text-xs bg-yellow-50 text-yellow-700 px-3 py-1 rounded-full font-semibold">
+              Score: {post.trendingScore}
             </span>
           )}
         </div>
-        <span className="text-xs text-gray-500 flex items-center gap-1.5">
-          <Calendar className="w-3.5 h-3.5" />
-          {new Date(post.createdAt).toLocaleDateString()}
-        </span>
-      </div>
 
-      {/* Trending Toggle */}
-      {showTrendingToggle && (
-        <div className="mb-3 flex items-center justify-between bg-gray-50 rounded-lg p-3 border border-gray-200">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-indigo-600" />
-            <span className="text-sm font-semibold text-gray-700">Set as Trending</span>
-          </div>
-          <button
-            onClick={() => handleToggleTrending(post._id, post.isTrending)}
-            disabled={togglingTrending[post._id]}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
-              post.isTrending
-                ? 'bg-orange-500 text-white hover:bg-orange-600'
-                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-            } ${togglingTrending[post._id] ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            {togglingTrending[post._id] ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                <span className="text-xs">Updating...</span>
-              </>
-            ) : (
-              <>
-                {post.isTrending ? (
+        {/* Edit Mode */}
+        {isEditing ? (
+          <div className="space-y-4 bg-blue-50 p-4 rounded-lg border-2 border-blue-300">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Edit Message</label>
+              <textarea
+                value={editMessage}
+                onChange={(e) => setEditMessage(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500 resize-none"
+                rows="4"
+                placeholder="Edit your post message..."
+              />
+            </div>
+
+            {/* Existing Images */}
+            {editImages.length > 0 && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Current Images</label>
+                <div className="flex flex-wrap gap-2">
+                  {editImages.map((img, idx) => (
+                    <div key={idx} className="relative">
+                      <img 
+                        src={img} 
+                        alt={`Current ${idx}`} 
+                        className="w-24 h-24 object-cover rounded-lg border-2 border-gray-300"
+                      />
+                      <button
+                        onClick={() => handleRemoveExistingImage(idx)}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* New Images Upload */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Add New Images</label>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageChange}
+                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-indigo-500"
+              />
+              {newImages.length > 0 && (
+                <p className="text-sm text-gray-600 mt-2">{newImages.length} new image(s) selected</p>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleSaveEdit(post._id)}
+                disabled={savingEdit}
+                className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingEdit ? (
                   <>
-                    <ToggleRight className="w-5 h-5" />
-                    <span className="text-xs">ON</span>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    Saving...
                   </>
                 ) : (
                   <>
-                    <ToggleLeft className="w-5 h-5" />
-                    <span className="text-xs">OFF</span>
+                    <Save className="w-4 h-4" />
+                    Save Changes
                   </>
                 )}
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
-      {/* School/Group Info */}
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
-        {post.schoolId && (
-          <span className="text-xs bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-semibold flex items-center gap-1">
-            <Building2 className="w-3 h-3" />
-            {typeof post.schoolId === 'object' ? post.schoolId.name : post.school || 'School Post'}
-          </span>
-        )}
-        {!post.schoolId && (
-          <span className="text-xs bg-green-50 text-green-700 px-3 py-1 rounded-full font-semibold">
-            🌍 {post.school || 'Global Post'}
-          </span>
-        )}
-        {post.trendingType && (
-          <span className="text-xs bg-purple-50 text-purple-700 px-3 py-1 rounded-full font-semibold">
-            {post.trendingType}
-          </span>
-        )}
-        {post.trendingScore !== undefined && (
-          <span className="text-xs bg-yellow-50 text-yellow-700 px-3 py-1 rounded-full font-semibold">
-            Score: {post.trendingScore}
-          </span>
-        )}
-      </div>
-
-      {/* Post Message */}
-      <p className="text-sm text-gray-800 mb-3 font-medium leading-relaxed">{post.message}</p>
-
-      {/* Post Images */}
-      {post.images && post.images.length > 0 && (
-        <div className="mb-3">
-          <img 
-            src={post.images[0]} 
-            alt="Post" 
-            className="w-full h-64 object-cover rounded-xl border-2 border-gray-200"
-          />
-        </div>
-      )}
-
-      {/* Poll Options */}
-      {post.poll && post.poll.options && post.poll.options.length > 0 && (
-        <div className="mb-3 space-y-2">
-          <p className="text-xs font-bold text-gray-700 mb-2 flex items-center gap-1.5">
-            <BarChart3 className="w-4 h-4 text-indigo-600" />
-            Poll Results:
-          </p>
-          {post.poll.options.map((option, idx) => (
-            <div key={idx} className="bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">
-              <div className="flex justify-between items-center text-sm">
-                <span className="font-semibold text-gray-700">{option.optionText}</span>
-                <span className="text-indigo-600 font-bold">{option.votes} votes</span>
-              </div>
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                disabled={savingEdit}
+                className="flex items-center gap-2 px-6 py-2 bg-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <X className="w-4 h-4" />
+                Cancel
+              </button>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ) : (
+          <>
+            {/* Post Message */}
+            <p className="text-sm text-gray-800 mb-3 font-medium leading-relaxed">{post.message}</p>
 
-      {/* Groups Tags */}
-      {post.groups && post.groups.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-3">
-          {post.groups.map((group) => (
-            <span key={group._id} className="text-xs bg-purple-50 text-purple-700 px-3 py-1 rounded-full font-semibold flex items-center gap-1">
-              <Users className="w-3 h-3" />
-              {group.name}
-            </span>
-          ))}
-        </div>
-      )}
+            {/* Post Images */}
+            {post.images && post.images.length > 0 && (
+              <div className="mb-3">
+                <img 
+                  src={post.images[0]} 
+                  alt="Post" 
+                  className="w-full h-64 object-cover rounded-xl border-2 border-gray-200"
+                />
+              </div>
+            )}
+          </>
+        )}
 
-      {/* Reactions */}
-      {post.reaction && post.reaction.length > 0 && (
-        <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
-          <span className="text-xs text-gray-600 font-medium">Reactions:</span>
-          <div className="flex gap-1">
-            {post.reaction.map((r, idx) => (
-              <span key={idx} className="text-lg">
-                {getReactionIcon(r.reaction)}
+        {/* Poll Options */}
+        {post.poll && post.poll.options && post.poll.options.length > 0 && !isEditing && (
+          <div className="mb-3 space-y-2">
+            <p className="text-xs font-bold text-gray-700 mb-2 flex items-center gap-1.5">
+              <BarChart3 className="w-4 h-4 text-indigo-600" />
+              Poll Results:
+            </p>
+            {post.poll.options.map((option, idx) => (
+              <div key={idx} className="bg-gray-50 px-4 py-3 rounded-xl border border-gray-200">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-semibold text-gray-700">{option.optionText}</span>
+                  <span className="text-indigo-600 font-bold">{option.votes} votes</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Groups Tags */}
+        {post.groups && post.groups.length > 0 && !isEditing && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {post.groups.map((group) => (
+              <span key={group._id} className="text-xs bg-purple-50 text-purple-700 px-3 py-1 rounded-full font-semibold flex items-center gap-1">
+                <Users className="w-3 h-3" />
+                {group.name}
               </span>
             ))}
           </div>
-          <span className="text-xs text-gray-500 ml-2">
-            {post.reaction.length} reaction{post.reaction.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-      )}
-    </div>
-  );
+        )}
+
+        {/* Reactions */}
+        {post.reaction && post.reaction.length > 0 && !isEditing && (
+          <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
+            <span className="text-xs text-gray-600 font-medium">Reactions:</span>
+            <div className="flex gap-1">
+              {post.reaction.map((r, idx) => (
+                <span key={idx} className="text-lg">
+                  {getReactionIcon(r.reaction)}
+                </span>
+              ))}
+            </div>
+            <span className="text-xs text-gray-500 ml-2">
+              {post.reaction.length} reaction{post.reaction.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">

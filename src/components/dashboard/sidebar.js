@@ -14,6 +14,7 @@ import {
   CreditCard,
   Building2,
   Bell,
+  Flame,
   HelpCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,11 +41,13 @@ const menuItems = [
       { id: 'School Groups', label: 'School Groups', icon: Building2, href: '/dashboard/school-groups' },
       { id: 'School Posts', label: 'School Posts', icon: Building2, href: '/dashboard/school-posts'},
       { id: 'Get School Details', label: 'Get School Post details', icon: Building2, href: '/dashboard/get-community'},
-      { id: 'Add School', label: 'Add School', icon: Building2, href: '/dashboard/add-school'},
-      
-      { id: 'All Schools', label: 'All Schools', icon: Building2, href: '/dashboard/all-school'},
-      
-      { id: 'billing', label: 'Billing', icon: CreditCard, href: '/dashboard/billing' },
+      { id: 'Active Challange', label: 'Active Challange', icon: Flame, href: '/dashboard/active-challange'},
+      { id: 'Add Resources', label: 'Add Resources', icon: Building2, href: '/dashboard/add-resource'},
+      { id: 'Coach Assign', label: 'Coach Assign', icon: Building2, href: '/dashboard/coach-assign'},
+      { id: 'Add Daily Tips', label: 'Add Daily Tips', icon: Building2, href: '/dashboard/add-tips'},
+      { id: 'Create Program', label:'Create Program', icon: Building2 , href:'/dashboard/create-program'},
+      // { id: 'All Schools', label: 'All Schools', icon: Building2, href: '/dashboard/all-school'},
+      // { id: 'billing', label: 'Billing', icon: CreditCard, href: '/dashboard/billing' },
       { id: 'notifications', label: 'Notifications', icon: Bell, href: '/dashboard/notifications' },
       { id: 'settings', label: 'Settings', icon: Settings, href: '/dashboard/settings' },
       { id: 'help', label: 'Help & Support', icon: HelpCircle, href: '/dashboard/help' },
