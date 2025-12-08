@@ -1,5 +1,6 @@
 
 const API_BASE_URL = "http://69.62.74.102:3000/api/v1";
+const API_BASE_URL_L = "http://localhost:3000/api/v1";
 
 const getHeaders = (isFormData = false) => {
   const token = localStorage.getItem('token');
@@ -190,5 +191,52 @@ export const getSchoolPosts = async (schoolId) => {
       error: error.message || 'Failed to fetch school posts',
       data: []
     };
+  }
+};
+export const uploadSchoolLogo = async (logoFile) => {
+  try {
+    const formData = new FormData();
+    formData.append('logo', logoFile);
+
+    const response = await fetch(`${API_BASE_URL_L}/School/logo`, {
+      method: 'POST',
+      headers: getHeaders(true), 
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Error uploading school logo:', error);
+    return { success: false, error: error.message || 'Failed to upload logo' };
+  }
+};
+
+export const updateSchoolLogo = async (logoFile) => {
+  try {
+    const formData = new FormData();
+    formData.append('logo', logoFile);
+
+    const response = await fetch(`${API_BASE_URL_L}/School/logo/update`, {
+      method: 'PUT',
+      headers: getHeaders(true),
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Error updating school logo:', error);
+    return { success: false, error: error.message || 'Failed to update logo' };
   }
 };

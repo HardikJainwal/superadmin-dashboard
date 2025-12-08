@@ -3,9 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { School, Users, FileText, BarChart3, Image as ImageIcon, Calendar, TrendingUp, Eye, Filter, ChevronRight, Building2, Flame, ToggleLeft, ToggleRight, AlertCircle, Sparkles, Edit, Trash2, X, Save } from 'lucide-react';
 import { getAllSchools, getPostsBySchool, getPostsByGroup, getTrendingPosts, setPostTrending, editCommunityPost, deleteCommunityPost } from '@/lib/getcommunityapi';
 import { getCommunityGroups } from '@/lib/communitypostapi';
+import { uploadSchoolLogo, updateSchoolLogo } from '@/lib/communitypostapi';
 
 const ViewPosts = () => {
   const [viewMode, setViewMode] = useState('schools'); 
+  const [logoFile, setLogoFile] = useState(null);
+const [uploadingLogo, setUploadingLogo] = useState(false);
   const [schools, setSchools] = useState([]);
   const [groups, setGroups] = useState([]);
   const [selectedSchool, setSelectedSchool] = useState(null);
@@ -233,6 +236,52 @@ const ViewPosts = () => {
       default: return '👍';
     }
   };
+  const handleLogoChange = (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    setLogoFile(file);
+  }
+};
+
+const handleUploadLogo = async () => {
+  if (!logoFile) {
+    setErrorMessage('Please select a logo file');
+    return;
+  }
+
+  setUploadingLogo(true);
+  const result = await uploadSchoolLogo(logoFile);
+  
+  if (result.success) {
+    setSuccessMessage('Logo uploaded successfully!');
+    setLogoFile(null);
+  } else {
+    setErrorMessage(result.error);
+  }
+  
+  setUploadingLogo(false);
+  setTimeout(() => { setSuccessMessage(''); setErrorMessage(''); }, 3000);
+};
+
+const handleUpdateLogo = async () => {
+  if (!logoFile) {
+    setErrorMessage('Please select a logo file');
+    return;
+  }
+
+  setUploadingLogo(true);
+  const result = await updateSchoolLogo(logoFile);
+  
+  if (result.success) {
+    setSuccessMessage('Logo updated successfully!');
+    setLogoFile(null);
+  } else {
+    setErrorMessage(result.error);
+  }
+  
+  setUploadingLogo(false);
+  setTimeout(() => { setSuccessMessage(''); setErrorMessage(''); }, 3000);
+};
 
   const renderPostCard = (post, showTrendingToggle = true) => {
     const isEditing = editingPost === post._id;
@@ -599,6 +648,37 @@ const ViewPosts = () => {
             </button>
           </div>
         </div>
+        {/* Logo Upload Section */}
+<div className="mb-6 bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+  <h2 className="text-xl font-bold text-gray-900 mb-4">School Logo Management</h2>
+  <div className="flex flex-col sm:flex-row gap-4 items-end">
+    <div className="flex-1">
+      <label className="block text-sm font-semibold text-gray-700 mb-2">Select Logo</label>
+      <input
+        type="file"
+        accept="image/*"
+        onChange={handleLogoChange}
+        className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg"
+      />
+    </div>
+    <div className="flex gap-2">
+      <button
+        onClick={handleUploadLogo}
+        disabled={uploadingLogo || !logoFile}
+        className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50"
+      >
+        {uploadingLogo ? 'Uploading...' : 'Upload'}
+      </button>
+      <button
+        onClick={handleUpdateLogo}
+        disabled={uploadingLogo || !logoFile}
+        className="px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50"
+      >
+        {uploadingLogo ? 'Updating...' : 'Update'}
+      </button>
+    </div>
+  </div>
+</div>
 
         {viewMode === 'trending' ? (
           // Trending Posts View

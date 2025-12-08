@@ -21,8 +21,8 @@ export default function CreateChallenge() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [challenges, setChallenges] = useState([]);
-  const [loadingChallenges, setLoadingChallenges] = useState(false);
-  const [showChallenges, setShowChallenges] = useState(false);
+  const [loadingChallenges, setLoadingChallenges] = useState(true);
+  const [showChallenges, setShowChallenges] = useState(true);
   const [togglingChallengeId, setTogglingChallengeId] = useState(null);
 
   // Fetch challenges

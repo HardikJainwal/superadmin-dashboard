@@ -6,16 +6,12 @@ import Link from 'next/link';
 import { 
   LayoutDashboard, 
   Users, 
-  ShoppingCart, 
-  Package,
-  BarChart3, 
   Settings,
-  FileText,
-  CreditCard,
   Building2,
   Bell,
   Flame,
-  HelpCircle
+  HelpCircle,
+  Stethoscope
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -43,6 +39,7 @@ const menuItems = [
       { id: 'Get School Details', label: 'Get School Post details', icon: Building2, href: '/dashboard/get-community'},
       { id: 'Active Challange', label: 'Active Challange', icon: Flame, href: '/dashboard/active-challange'},
       { id: 'Add Resources', label: 'Add Resources', icon: Building2, href: '/dashboard/add-resource'},
+      { id: 'Add Equipment', label: 'Add Equipment', icon: Stethoscope, href: '/dashboard/add-equipment'},
       { id: 'Coach Assign', label: 'Coach Assign', icon: Building2, href: '/dashboard/coach-assign'},
       { id: 'Add Daily Tips', label: 'Add Daily Tips', icon: Building2, href: '/dashboard/add-tips'},
       { id: 'Create Program', label:'Create Program', icon: Building2 , href:'/dashboard/create-program'},
