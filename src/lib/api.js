@@ -1,18 +1,36 @@
-const API_URL = process.env.NEXT_PUBLIC_R_BACKEND_URL || 'http://localhost:5000';
+import { AuthManager } from './auth-manager';
+import { BACKEND_CONFIG } from './auth-manager';
 
 class ApiClient {
-  constructor(baseURL = API_URL) {
-    this.baseURL = baseURL;
+  constructor() {
+    this.baseURL = null;
+  }
+
+  setBackend(backend) {
+    const config = BACKEND_CONFIG[backend];
+    this.baseURL = config.url;
+    this.backend = backend;
   }
 
   buildUrl(endpoint) {
+    if (!this.baseURL) {
+      const currentBackend = AuthManager.getCurrentBackend();
+      if (currentBackend) {
+        this.setBackend(currentBackend);
+      }
+    }
     return `${this.baseURL}${endpoint}`;
   }
 
   async request(endpoint, options = {}) {
     const url = this.buildUrl(endpoint);
+    const token = AuthManager.getToken(this.backend || AuthManager.getCurrentBackend());
+    
     const response = await fetch(url, {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      },
       ...options,
     });
 

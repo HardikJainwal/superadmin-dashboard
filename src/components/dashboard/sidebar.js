@@ -11,7 +11,8 @@ import {
   Bell,
   Flame,
   HelpCircle,
-  Stethoscope
+  Stethoscope,
+  FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -32,17 +33,26 @@ const menuItems = [
     ]
   },
   {
+    label: 'Website Management',
+    items: [
+      { id: 'blogs', label: 'Blog Posts', icon: FileText, href: '/dashboard/blogs' },
+    ]
+  },
+  {
     label: 'School Management',
     items: [
       { id: 'School Groups', label: 'School Groups', icon: Building2, href: '/dashboard/school-groups' },
+
       { id: 'School Posts', label: 'School Posts', icon: Building2, href: '/dashboard/school-posts'},
       { id: 'Get School Details', label: 'Get School Post details', icon: Building2, href: '/dashboard/get-community'},
       { id: 'Active Challange', label: 'Active Challange', icon: Flame, href: '/dashboard/active-challange'},
       { id: 'Add Resources', label: 'Add Resources', icon: Building2, href: '/dashboard/add-resource'},
+      { id: 'Add Corporate Resources', label: 'Add Corporate Resources', icon: Building2, href: '/dashboard/corporate-resources'},
       { id: 'Add Equipment', label: 'Add Equipment', icon: Stethoscope, href: '/dashboard/add-equipment'},
       { id: 'Coach Assign', label: 'Coach Assign', icon: Building2, href: '/dashboard/coach-assign'},
       { id: 'Add Daily Tips', label: 'Add Daily Tips', icon: Building2, href: '/dashboard/add-tips'},
       { id: 'Create Program', label:'Create Program', icon: Building2 , href:'/dashboard/create-program'},
+      { id: 'Quiz Modules', label: 'Quiz Modules', icon: Building2, href: '/dashboard/quiz-modules'},
       // { id: 'All Schools', label: 'All Schools', icon: Building2, href: '/dashboard/all-school'},
       // { id: 'billing', label: 'Billing', icon: CreditCard, href: '/dashboard/billing' },
       { id: 'notifications', label: 'Notifications', icon: Bell, href: '/dashboard/notifications' },

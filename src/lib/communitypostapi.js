@@ -1,9 +1,16 @@
+import { AuthManager, BACKEND_CONFIG } from './auth-manager';
 
-const API_BASE_URL = "http://69.62.74.102:3000/api/v1";
-const API_BASE_URL_L = "http://localhost:3000/api/v1";
+const getAPIBaseURL = () => {
+  const currentBackend = AuthManager.getCurrentBackend();
+  if (!currentBackend) {
+    throw new Error('No backend selected');
+  }
+  return BACKEND_CONFIG[currentBackend].url + '/api/v1';
+};
 
 const getHeaders = (isFormData = false) => {
-  const token = localStorage.getItem('token');
+  const currentBackend = AuthManager.getCurrentBackend();
+  const token = currentBackend ? AuthManager.getToken(currentBackend) : null;
   const headers = {};
   
   if (!isFormData) {
@@ -19,6 +26,7 @@ const getHeaders = (isFormData = false) => {
 
 export const getCommunityGroups = async () => {
   try {
+    const API_BASE_URL = getAPIBaseURL();
     const response = await fetch(`${API_BASE_URL}/communityGroup/`, {
       method: 'GET',
       headers: getHeaders(),
@@ -46,6 +54,7 @@ export const getCommunityGroups = async () => {
 
 export const createTextPost = async (message, groups = []) => {
   try {
+    const API_BASE_URL = getAPIBaseURL();
     const response = await fetch(`${API_BASE_URL}/school/communityPost`, {
       method: 'POST',
       headers: getHeaders(),
@@ -77,6 +86,7 @@ export const createTextPost = async (message, groups = []) => {
 
 export const createPollPost = async (message, pollOptions, groups = []) => {
   try {
+    const API_BASE_URL = getAPIBaseURL();
     const response = await fetch(`${API_BASE_URL}/school/communityPost`, {
       method: 'POST',
       headers: getHeaders(),
@@ -109,6 +119,7 @@ export const createPollPost = async (message, pollOptions, groups = []) => {
 
 export const createImagePost = async (message, image, groups = []) => {
   try {
+    const API_BASE_URL = getAPIBaseURL();
     const formData = new FormData();
     formData.append('postType', 'image');
     formData.append('message', message);
@@ -165,6 +176,7 @@ export const createPost = async (postData) => {
 
 export const getSchoolPosts = async (schoolId) => {
   try {
+    const API_BASE_URL = getAPIBaseURL();
     const url = schoolId 
       ? `${API_BASE_URL}/school/communityPost?schoolId=${schoolId}`
       : `${API_BASE_URL}/school/communityPost`;
@@ -193,12 +205,14 @@ export const getSchoolPosts = async (schoolId) => {
     };
   }
 };
+
 export const uploadSchoolLogo = async (logoFile) => {
   try {
+    const API_BASE_URL = getAPIBaseURL();
     const formData = new FormData();
     formData.append('logo', logoFile);
 
-    const response = await fetch(`${API_BASE_URL_L}/School/logo`, {
+    const response = await fetch(`${API_BASE_URL}/School/logo`, {
       method: 'POST',
       headers: getHeaders(true), 
       body: formData,
@@ -219,10 +233,11 @@ export const uploadSchoolLogo = async (logoFile) => {
 
 export const updateSchoolLogo = async (logoFile) => {
   try {
+    const API_BASE_URL = getAPIBaseURL();
     const formData = new FormData();
     formData.append('logo', logoFile);
 
-    const response = await fetch(`${API_BASE_URL_L}/School/logo/update`, {
+    const response = await fetch(`${API_BASE_URL}/School/logo/update`, {
       method: 'PUT',
       headers: getHeaders(true),
       body: formData,

@@ -1,16 +1,25 @@
+import { AuthManager, BACKEND_CONFIG } from './auth-manager';
 
-const API_BASE_URL = 'http://69.62.74.102:3000/api/v1';
+const getAPIBaseURL = () => {
+  const currentBackend = AuthManager.getCurrentBackend();
+  if (!currentBackend) {
+    throw new Error('No backend selected');
+  }
+  return BACKEND_CONFIG[currentBackend].url + '/api/v1';
+};
 
 const getAuthHeader = () => {
-  const token = localStorage.getItem('token');
+  const currentBackend = AuthManager.getCurrentBackend();
+  const token = currentBackend ? AuthManager.getToken(currentBackend) : null;
+  
   return {
     'Authorization': `Bearer ${token}`
   };
 };
 
-
 const getGroupsCount = async () => {
   try {
+    const API_BASE_URL = getAPIBaseURL();
     const response = await fetch(`${API_BASE_URL}/superAdmin/groups-counts`, {
       method: 'GET',
       headers: {
@@ -31,9 +40,9 @@ const getGroupsCount = async () => {
   }
 };
 
-
 const createGroup = async (formData) => {
   try {
+    const API_BASE_URL = getAPIBaseURL();
     const response = await fetch(`${API_BASE_URL}/communityGroup/`, {
       method: 'POST',
       headers: getAuthHeader(),
@@ -52,10 +61,9 @@ const createGroup = async (formData) => {
   }
 };
 
-
-
 const updateGroup = async (groupId, formData) => {
   try {
+    const API_BASE_URL = getAPIBaseURL();
     const response = await fetch(`${API_BASE_URL}/communityGroup/${groupId}`, {
       method: 'PUT',
       headers: getAuthHeader(),
@@ -76,6 +84,7 @@ const updateGroup = async (groupId, formData) => {
 
 const deleteGroup = async (groupId) => {
   try {
+    const API_BASE_URL = getAPIBaseURL();
     const response = await fetch(`${API_BASE_URL}/communityGroup/${groupId}`, {
       method: 'DELETE',
       headers: getAuthHeader(),

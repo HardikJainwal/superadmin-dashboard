@@ -8,7 +8,7 @@ import { uploadSchoolLogo, updateSchoolLogo } from '@/lib/communitypostapi';
 const ViewPosts = () => {
   const [viewMode, setViewMode] = useState('schools'); 
   const [logoFile, setLogoFile] = useState(null);
-const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [schools, setSchools] = useState([]);
   const [groups, setGroups] = useState([]);
   const [selectedSchool, setSelectedSchool] = useState(null);

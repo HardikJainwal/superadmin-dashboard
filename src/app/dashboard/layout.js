@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { AuthManager } from '@/lib/auth-manager';
 import Sidebar from '@/components/dashboard/sidebar';
 import Header from '@/components/dashboard/header';
 
@@ -10,8 +11,9 @@ export default function DashboardLayout({ children }) {
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
+    const currentBackend = AuthManager.getCurrentBackend();
+    
+    if (!currentBackend || !AuthManager.isAuthenticated(currentBackend)) {
       router.push('/login');
     }
   }, [router]);

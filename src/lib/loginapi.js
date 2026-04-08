@@ -1,8 +1,11 @@
-const API_BASE_URL = 'http://69.62.74.102:3000/api/v1/superAdmin';
+import { BACKEND_CONFIG } from "./auth-manager";
 
-export const sendOTP = async (email) => {
+export const sendOTP = async (email, backend) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/login`, {
+    const config = BACKEND_CONFIG[backend];
+    const apiUrl = `${config.url}${config.apiPath}/login`;
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
@@ -20,9 +23,12 @@ export const sendOTP = async (email) => {
   }
 };
 
-export const verifyOTP = async (email, otp) => {
+export const verifyOTP = async (email, otp, backend) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/verify-otp`, {
+    const config = BACKEND_CONFIG[backend];
+    const apiUrl = `${config.url}${config.apiPath}/verify-otp`;
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, otp: parseInt(otp) }),
