@@ -13,7 +13,7 @@ export const BACKEND_CONFIG = {
   },
   [BACKENDS.CORPORATE]: {
     name: 'Corporate Management',
-    url: 'https://corporateapi.devdoot.org',
+    url: 'https://api.humanova.live',
     apiPath: '/api/v1/superAdmin',
     color: 'purple'
   },

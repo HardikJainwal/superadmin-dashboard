@@ -22,7 +22,7 @@ const ResourceAdminPanel = () => {
   const [fetchingResources, setFetchingResources] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  const API_URL = 'https://corporateapi.devdoot.org/api/v1/superAdmin/resource';
+  const API_URL = 'https://api.humanova.live/api/v1/superAdmin/resource';
 
   const resourceTypes = [
     { value: 'youtube', label: 'YouTube Video', urlField: 'videoUrl' },

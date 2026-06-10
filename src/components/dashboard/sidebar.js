@@ -12,7 +12,12 @@ import {
   Flame,
   HelpCircle,
   Stethoscope,
-  FileText
+  FileText,
+  Zap,
+  ShieldCheck,
+  UserCog,
+  UserPlus,
+  icons
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -36,6 +41,23 @@ const menuItems = [
     label: 'Website Management',
     items: [
       { id: 'blogs', label: 'Blog Posts', icon: FileText, href: '/dashboard/blogs' },
+      { id: 'coaches', label: 'All Coaches', icon: UserCog, href: '/dashboard/Allcoaches'}
+    ]
+  },
+  {
+    label: 'Corporate Management',
+    items: [
+      { id: 'create-org', label: 'Create Organization', icon: Building2, href: '/dashboard/createCorporate' },
+      { id: 'company-config', label: 'Company Config', icon: Settings, href: '/dashboard/company-config' },
+      { id: 'create-admin', label: 'Create Admin', icon: UserCog, href: '/dashboard/create-admin' },
+      { id: 'create-user', label: 'Create User', icon: UserPlus, href: '/dashboard/create-user' },
+      { id: 'corporate-features', label: 'Features', icon: Zap, href: '/dashboard/corporate-features' },
+      { id: 'corporate-permissions', label: 'Permissions', icon: ShieldCheck, href: '/dashboard/corporate-permissions' },
+      { id: 'role-permissions', label: 'Role Permissions', icon: UserCog, href: '/dashboard/role-permissions' },
+      { id: 'org-features', label: 'Org Features', icon: Building2, href: '/dashboard/org-features' },
+      { id: 'user-roles', label: 'User Roles', icon: Users, href: '/dashboard/user-roles' },
+      { id: 'corporate-resources', label: 'Resources', icon: Building2, href: '/dashboard/corporate-resources' },
+      { id: 'corporate-coach-assign', label: 'Coach Assign', icon: UserCog, href: '/dashboard/corporate-coach-assign' },
     ]
   },
   {
@@ -47,7 +69,6 @@ const menuItems = [
       { id: 'Get School Details', label: 'Get School Post details', icon: Building2, href: '/dashboard/get-community'},
       { id: 'Active Challange', label: 'Active Challange', icon: Flame, href: '/dashboard/active-challange'},
       { id: 'Add Resources', label: 'Add Resources', icon: Building2, href: '/dashboard/add-resource'},
-      { id: 'Add Corporate Resources', label: 'Add Corporate Resources', icon: Building2, href: '/dashboard/corporate-resources'},
       { id: 'Add Equipment', label: 'Add Equipment', icon: Stethoscope, href: '/dashboard/add-equipment'},
       { id: 'Coach Assign', label: 'Coach Assign', icon: Building2, href: '/dashboard/coach-assign'},
       { id: 'Add Daily Tips', label: 'Add Daily Tips', icon: Building2, href: '/dashboard/add-tips'},
