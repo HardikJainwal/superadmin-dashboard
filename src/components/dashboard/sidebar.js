@@ -45,19 +45,33 @@ const menuItems = [
     ]
   },
   {
-    label: 'Corporate Management',
+    label: '⚙️ Initial Setup',
+    subtitle: 'Create these first — they are global',
     items: [
-      { id: 'create-org', label: 'Create Organization', icon: Building2, href: '/dashboard/createCorporate' },
-      { id: 'company-config', label: 'Company Config', icon: Settings, href: '/dashboard/company-config' },
-      { id: 'create-admin', label: 'Create Admin', icon: UserCog, href: '/dashboard/create-admin' },
-      { id: 'create-user', label: 'Create User', icon: UserPlus, href: '/dashboard/create-user' },
-      { id: 'corporate-features', label: 'Features', icon: Zap, href: '/dashboard/corporate-features' },
-      { id: 'corporate-permissions', label: 'Permissions', icon: ShieldCheck, href: '/dashboard/corporate-permissions' },
-      { id: 'role-permissions', label: 'Role Permissions', icon: UserCog, href: '/dashboard/role-permissions' },
-      { id: 'org-features', label: 'Org Features', icon: Building2, href: '/dashboard/org-features' },
+      { id: 'corporate-features', label: '⚡ Features', icon: Zap, href: '/dashboard/corporate-features' },
+      { id: 'corporate-permissions', label: '🛡️ Permissions', icon: ShieldCheck, href: '/dashboard/corporate-permissions' },
+    ]
+  },
+  {
+    label: '🏢 Org Onboarding',
+    subtitle: 'Follow these steps in order',
+    items: [
+      { id: 'create-org', label: '① Create Organization', icon: Building2, href: '/dashboard/createCorporate' },
+      { id: 'company-config', label: '② Company Config', icon: Settings, href: '/dashboard/company-config' },
+      { id: 'create-admin', label: '③ Create Admin', icon: UserCog, href: '/dashboard/create-admin' },
+      { id: 'create-user', label: '④ Create User', icon: UserPlus, href: '/dashboard/create-user' },
+    ]
+  },
+  {
+    label: '🔧 Org Configuration',
+    subtitle: 'Configure after onboarding',
+    items: [
+      { id: 'org-features', label: 'Org Features', icon: Zap, href: '/dashboard/org-features' },
       { id: 'user-roles', label: 'User Roles', icon: Users, href: '/dashboard/user-roles' },
-      { id: 'corporate-resources', label: 'Resources', icon: Building2, href: '/dashboard/corporate-resources' },
-      { id: 'corporate-coach-assign', label: 'Coach Assign', icon: UserCog, href: '/dashboard/corporate-coach-assign' },
+      { id: 'user-roles', label: 'Corporate Community', icon: Users, href: '/dashboard/corporate-community' },
+      { id: 'role-permissions', label: 'Role Permissions', icon: ShieldCheck, href: '/dashboard/role-permissions' },
+      { id: 'corporate-resources', label: 'Resources', icon: FileText, href: '/dashboard/corporate-resources' },
+      { id: 'corporate-coach-assign', label: 'Coach Assignment', icon: Stethoscope, href: '/dashboard/corporate-coach-assign' },
     ]
   },
   {
@@ -99,9 +113,14 @@ export default function Sidebar({ isOpen }) {
           <nav className="grid gap-6 px-2">
             {menuItems.map((section, idx) => (
               <div key={idx}>
-                <h3 className="mb-2 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <h3 className="mb-1 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   {section.label}
                 </h3>
+                {section.subtitle && (
+                  <p className="mb-2 px-4 text-[10px] text-muted-foreground/70 leading-tight">
+                    {section.subtitle}
+                  </p>
+                )}
                 <div className="grid gap-1">
                   {section.items.map((item) => {
                     const Icon = item.icon;

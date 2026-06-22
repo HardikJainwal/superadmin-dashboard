@@ -1,6 +1,9 @@
 'use client'
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Edit2, Trash2, Save, X, RefreshCw } from 'lucide-react';
+
+const API_URL = 'https://api.humanova.live/api/v1/superAdmin/resource';
+const API_BASE = 'https://api.humanova.live/api/v1';
 
 const ResourceAdminPanel = () => {
   const [resources, setResources] = useState([]);
@@ -22,7 +25,12 @@ const ResourceAdminPanel = () => {
   const [fetchingResources, setFetchingResources] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  const API_URL = 'https://api.humanova.live/api/v1/superAdmin/resource';
+  // School selection state
+  const [schools, setSchools] = useState([]);
+  const [schoolsLoading, setSchoolsLoading] = useState(false);
+  const [schoolSearch, setSchoolSearch] = useState('');
+  const [isSchoolDropdownOpen, setIsSchoolDropdownOpen] = useState(false);
+  const schoolDropdownRef = useRef(null);
 
   const resourceTypes = [
     { value: 'youtube', label: 'YouTube Video', urlField: 'videoUrl' },
@@ -34,6 +42,76 @@ const ResourceAdminPanel = () => {
   // Get token from localStorage
   const getAuthToken = () => {
     return localStorage.getItem('corporate_token');
+  };
+
+  // Fetch all schools with pagination
+  const fetchSchools = async () => {
+    const token = getAuthToken();
+    if (!token) return;
+
+    setSchoolsLoading(true);
+    try {
+      let allSchools = [];
+      let currentPage = 1;
+      let totalPages = 1;
+
+      while (currentPage <= totalPages) {
+        const response = await fetch(`${API_BASE}/superAdmin/schools?page=${currentPage}&limit=100`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+        });
+
+        if (!response.ok) break;
+
+        const result = await response.json();
+        allSchools = [...allSchools, ...(result.schools || result.data || [])];
+        totalPages = result.totalPages || 1;
+        currentPage++;
+      }
+
+      setSchools(allSchools);
+    } catch (error) {
+      console.error('Error fetching schools:', error);
+    } finally {
+      setSchoolsLoading(false);
+    }
+  };
+
+  // Close school dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (schoolDropdownRef.current && !schoolDropdownRef.current.contains(e.target)) {
+        setIsSchoolDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredSchools = schools.filter((school) => {
+    const name = (school.schoolName || school.name || '').toLowerCase();
+    const id = (school._id || '').toLowerCase();
+    const query = schoolSearch.toLowerCase();
+    return name.includes(query) || id.includes(query);
+  });
+
+  const selectedSchool = schools.find((s) => s._id === formData.schoolId);
+  const selectedSchoolName = selectedSchool
+    ? (selectedSchool.schoolName || selectedSchool.name || selectedSchool._id)
+    : '';
+
+  const handleSelectSchool = (school) => {
+    setFormData((prev) => ({ ...prev, schoolId: school._id }));
+    setSchoolSearch('');
+    setIsSchoolDropdownOpen(false);
+  };
+
+  const handleClearSchool = () => {
+    setFormData((prev) => ({ ...prev, schoolId: '' }));
+    setSchoolSearch('');
   };
 
   const getCurrentUrlField = () => {
@@ -61,6 +139,8 @@ const ResourceAdminPanel = () => {
     });
     setEditingId(null);
     setIsFormOpen(false);
+    setSchoolSearch('');
+    setIsSchoolDropdownOpen(false);
   };
 
   const showMessage = (type, text) => {
@@ -113,9 +193,10 @@ const ResourceAdminPanel = () => {
     }
   };
 
-  // Fetch resources on component mount
+  // Fetch resources and schools on component mount
   useEffect(() => {
     fetchResources();
+    fetchSchools();
   }, []);
 
   const handleSubmit = async () => {
@@ -183,6 +264,12 @@ const ResourceAdminPanel = () => {
       setResources(prev => prev.filter(r => (r._id || r.id) !== id));
       showMessage('success', 'Resource deleted successfully!');
     }
+  };
+
+  // Helper to get school name by ID (for the resource list)
+  const getSchoolNameById = (id) => {
+    const school = schools.find(s => s._id === id);
+    return school ? (school.schoolName || school.name || id) : id;
   };
 
   return (
@@ -311,18 +398,135 @@ const ResourceAdminPanel = () => {
                     />
                   </div>
 
+                  {/* School Selection Dropdown */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      School ID (Optional)
+                      School / Organization (Optional)
+                      {schools.length > 0 && (
+                        <span className="text-xs font-normal text-gray-400 ml-2">
+                          ({schools.length} available)
+                        </span>
+                      )}
                     </label>
-                    <input
-                      type="text"
-                      name="schoolId"
-                      value={formData.schoolId}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter school ID (leave empty for global resource)"
-                    />
+
+                    {schoolsLoading ? (
+                      <div className="flex items-center gap-2 text-sm text-gray-400 py-2.5 px-3 bg-gray-50 border border-gray-300 rounded-lg">
+                        <svg className="animate-spin h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        Loading schools...
+                      </div>
+                    ) : (
+                      <div className="relative" ref={schoolDropdownRef}>
+                        {/* Selected school display */}
+                        {formData.schoolId && !isSchoolDropdownOpen ? (
+                          <div className="flex items-center justify-between w-full px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></span>
+                              <span className="text-sm font-medium text-gray-800 truncate">{selectedSchoolName}</span>
+                              <span className="text-xs text-gray-400 font-mono flex-shrink-0">({formData.schoolId.slice(-8)})</span>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsSchoolDropdownOpen(true);
+                                  setSchoolSearch('');
+                                }}
+                                className="p-1 hover:bg-blue-100 rounded transition-colors text-gray-400 hover:text-blue-600"
+                                title="Change school"
+                              >
+                                <RefreshCw size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleClearSchool}
+                                className="p-1 hover:bg-red-100 rounded transition-colors text-gray-400 hover:text-red-500"
+                                title="Clear (make global)"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="relative">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16" height="16"
+                                viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                              >
+                                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                              </svg>
+                              <input
+                                type="text"
+                                value={schoolSearch}
+                                onChange={(e) => {
+                                  setSchoolSearch(e.target.value);
+                                  setIsSchoolDropdownOpen(true);
+                                }}
+                                onFocus={() => setIsSchoolDropdownOpen(true)}
+                                placeholder="Search schools by name or ID... (leave empty for global)"
+                                className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                autoComplete="off"
+                              />
+                            </div>
+
+                            {/* Dropdown list */}
+                            {isSchoolDropdownOpen && (
+                              <div className="absolute z-[60] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                {/* Global option */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleClearSchool();
+                                    setIsSchoolDropdownOpen(false);
+                                  }}
+                                  className={`w-full text-left px-4 py-2.5 hover:bg-green-50 transition-colors flex items-center gap-2 border-b border-gray-100 ${
+                                    !formData.schoolId ? 'bg-green-50' : ''
+                                  }`}
+                                >
+                                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${!formData.schoolId ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                  <span className="text-sm font-medium text-green-700">🌍 Global (All Schools)</span>
+                                </button>
+
+                                {filteredSchools.length === 0 ? (
+                                  <div className="px-4 py-3 text-sm text-gray-400 text-center">
+                                    {schoolSearch ? 'No schools match your search' : 'No schools found'}
+                                  </div>
+                                ) : (
+                                  filteredSchools.map((school) => (
+                                    <button
+                                      key={school._id}
+                                      type="button"
+                                      onClick={() => handleSelectSchool(school)}
+                                      className={`w-full text-left px-4 py-2.5 hover:bg-blue-50 transition-colors flex items-center justify-between group ${
+                                        formData.schoolId === school._id ? 'bg-blue-50' : ''
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                          formData.schoolId === school._id ? 'bg-blue-500' : 'bg-gray-300 group-hover:bg-blue-400'
+                                        }`}></span>
+                                        <span className="text-sm font-medium text-gray-800 truncate">
+                                          {school.schoolName || school.name || 'Unnamed School'}
+                                        </span>
+                                      </div>
+                                      <span className="text-xs text-gray-400 font-mono flex-shrink-0 ml-2">
+                                        {school._id?.slice(-8)}
+                                      </span>
+                                    </button>
+                                  ))
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <p className="text-xs text-gray-500 mt-1">
                       Leave empty to make this resource available to all schools
                     </p>
@@ -381,7 +585,7 @@ const ResourceAdminPanel = () => {
           ) : resources.length === 0 ? (
             <div className="p-12 text-center text-gray-500">
               <p className="text-lg">No resources yet</p>
-              <p className="text-sm mt-2">Click "Add Resource" to create your first resource</p>
+              <p className="text-sm mt-2">Click &quot;Add Resource&quot; to create your first resource</p>
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
@@ -396,7 +600,7 @@ const ResourceAdminPanel = () => {
                         </span>
                         {resource.schoolId && (
                           <span className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded">
-                            School: {resource.schoolId}
+                            🏫 {getSchoolNameById(resource.schoolId)}
                           </span>
                         )}
                         {!resource.schoolId && (

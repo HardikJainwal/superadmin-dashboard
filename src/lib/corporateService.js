@@ -217,11 +217,11 @@ export const createOrg = async (payload) => {
 // ─── Admin Creation ─────────────────────────────────────────────────────────────
 
 // POST create an admin for an organization
-export const createOrgAdmin = async ({ email, schoolId, accessType }) => {
+export const createOrgAdmin = async ({ email, firstName, lastName, schoolId, accessType }) => {
   const response = await fetch(`${BASE_URL}/school/create-school-admin`, {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ email, schoolId, accessType })
+    body: JSON.stringify({ email, firstName, lastName, schoolId, accessType })
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));

@@ -222,6 +222,19 @@ export default function UserRolesPage() {
           </div>
         </div>
 
+        {/* Flow Guidance Banner */}
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 backdrop-blur-sm rounded-2xl border border-amber-100/60 p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-1.5 bg-amber-100 rounded-lg flex-shrink-0 mt-0.5">
+              <UserCog size={14} className="text-amber-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-amber-800">🔧 Org Configuration</p>
+              <p className="text-xs text-amber-600/80 mt-0.5">Create roles for an organization and assign them to admins. The <strong>organization must be created</strong> first (Org Onboarding), and <strong>admins must exist</strong> before you can assign roles. After creating roles, assign permissions to them in <strong>Role Permissions</strong>.</p>
+            </div>
+          </div>
+        </div>
+
         {/* Step 1: Select Organization */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/60 p-6">
           <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">

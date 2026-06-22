@@ -4,7 +4,7 @@ import {
   RefreshCw, Search, AlertCircle, CheckCircle2, Building2,
   ToggleLeft, ToggleRight, Zap, Loader2, ChevronDown, ChevronUp, Info
 } from 'lucide-react';
-import { getAllFeatures, toggleOrgFeature, getOrgFeatures, getAllOrgs } from '@/lib/corporateService';
+import { getAllFeatures, toggleOrgFeature, getAllOrgs } from '@/lib/corporateService';
 
 export default function OrgFeaturesPage() {
   const [allFeatures, setAllFeatures] = useState([]);
@@ -14,7 +14,6 @@ export default function OrgFeaturesPage() {
   const [loadingOrgs, setLoadingOrgs] = useState(true);
   const [orgId, setOrgId] = useState('');
   const [orgIdApplied, setOrgIdApplied] = useState('');
-  const [loadingOrg, setLoadingOrg] = useState(false);
   const [togglingCode, setTogglingCode] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [toast, setToast] = useState(null);
@@ -27,7 +26,7 @@ export default function OrgFeaturesPage() {
     setTimeout(() => setToast(null), 4000);
   }, []);
 
-  // ── Fetch all available features ──────────────────────────────────────────────
+  // Fetch all available features (global feature list)
   const fetchAllFeatures = useCallback(async () => {
     setLoading(true);
     try {
@@ -43,7 +42,7 @@ export default function OrgFeaturesPage() {
 
   useEffect(() => { fetchAllFeatures(); }, [fetchAllFeatures]);
 
-  // ── Fetch all orgs ────────────────────────────────────────────────────────────
+  // Fetch all orgs (features array is embedded in the response)
   const fetchOrgs = useCallback(async () => {
     setLoadingOrgs(true);
     try {
@@ -59,34 +58,36 @@ export default function OrgFeaturesPage() {
 
   useEffect(() => { fetchOrgs(); }, [fetchOrgs]);
 
-  // ── Load org's enabled features ───────────────────────────────────────────────
-  const loadOrgFeatures = async () => {
-    if (!orgId.trim()) {
-      showToast('error', 'Please enter an Org ID');
+  // When org dropdown changes, immediately load its enabled features
+  // from the already-fetched orgs array (no extra API call needed).
+  // The all-org response already has features[].featureCode + isEnabled.
+  const handleOrgChange = (e) => {
+    const selectedId = e.target.value;
+    setOrgId(selectedId);
+
+    if (!selectedId) {
+      setOrgIdApplied('');
+      setOrgFeatureCodes([]);
       return;
     }
-    setLoadingOrg(true);
-    setOrgIdApplied(orgId.trim());
-    try {
-      const data = await getOrgFeatures(orgId.trim());
-      const codes = Array.isArray(data)
-        ? data.map(f => f.featureCode || f.code || f).filter(Boolean)
-        : [];
-      setOrgFeatureCodes(codes);
-      showToast('success', `Loaded ${codes.length} enabled features for org`);
-    } catch (err) {
-      // If the endpoint doesn't exist or returns error, start with empty
-      setOrgFeatureCodes([]);
-      showToast('error', `Could not load org features: ${err.message}`);
-    } finally {
-      setLoadingOrg(false);
+
+    const org = orgs.find(o => o._id === selectedId);
+    if (org) {
+      // Extract feature codes where isEnabled === true
+      const enabledCodes = (org.features || [])
+        .filter(f => f.isEnabled === true)
+        .map(f => f.featureCode)
+        .filter(Boolean);
+
+      setOrgFeatureCodes(enabledCodes);
+      setOrgIdApplied(selectedId);
     }
   };
 
-  // ── Toggle a feature for the org ──────────────────────────────────────────────
+  // Toggle a feature for the selected org
   const handleToggle = async (featureCode) => {
     if (!orgIdApplied) {
-      showToast('error', 'Please load an Org first');
+      showToast('error', 'Please select an Org first');
       return;
     }
     const isCurrentlyEnabled = orgFeatureCodes.includes(featureCode);
@@ -97,15 +98,23 @@ export default function OrgFeaturesPage() {
       await toggleOrgFeature({
         featureCode,
         orgId: orgIdApplied,
-        isEnabled: newEnabled
+        isEnabled: newEnabled,
       });
-      // Optimistically update local state
-      if (newEnabled) {
-        setOrgFeatureCodes(prev => [...prev, featureCode]);
-      } else {
-        setOrgFeatureCodes(prev => prev.filter(c => c !== featureCode));
-      }
-      showToast('success', `${featureCode} ${newEnabled ? 'enabled' : 'disabled'} for org`);
+      // Optimistic update
+      setOrgFeatureCodes(prev =>
+        newEnabled ? [...prev, featureCode] : prev.filter(c => c !== featureCode)
+      );
+      // Also sync into orgs state so switching away and back stays accurate
+      setOrgs(prev => prev.map(o => {
+        if (o._id !== orgIdApplied) return o;
+        return {
+          ...o,
+          features: o.features.map(f =>
+            f.featureCode === featureCode ? { ...f, isEnabled: newEnabled } : f
+          ),
+        };
+      }));
+      showToast('success', `${featureCode} ${newEnabled ? 'enabled' : 'disabled'}`);
     } catch (err) {
       showToast('error', err.message);
     } finally {
@@ -113,7 +122,7 @@ export default function OrgFeaturesPage() {
     }
   };
 
-  // ── Sort & filter ─────────────────────────────────────────────────────────────
+  // Sort & filter
   const toggleSort = (field) => {
     if (sortField === field) {
       setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
@@ -151,9 +160,7 @@ export default function OrgFeaturesPage() {
       {/* Toast */}
       {toast && (
         <div className={`fixed top-6 right-6 z-[100] flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl backdrop-blur-md text-sm font-medium transition-all animate-slideIn ${
-          toast.type === 'success'
-            ? 'bg-emerald-500/90 text-white'
-            : 'bg-red-500/90 text-white'
+          toast.type === 'success' ? 'bg-emerald-500/90 text-white' : 'bg-red-500/90 text-white'
         }`}>
           {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
           {toast.text}
@@ -161,7 +168,7 @@ export default function OrgFeaturesPage() {
       )}
 
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* ─── Header ──────────────────────────────────────────────────────── */}
+        {/* Header */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/60 p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
@@ -174,56 +181,70 @@ export default function OrgFeaturesPage() {
               <p className="text-slate-500 mt-1 ml-14">Enable or disable features for a specific organization</p>
             </div>
             <button
-              onClick={fetchAllFeatures}
-              disabled={loading}
+              onClick={() => { fetchAllFeatures(); fetchOrgs(); }}
+              disabled={loading || loadingOrgs}
               className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium text-sm transition-all disabled:opacity-50"
             >
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+              <RefreshCw size={16} className={(loading || loadingOrgs) ? 'animate-spin' : ''} />
               Refresh
             </button>
           </div>
         </div>
 
-        {/* ─── Org Selector ──────────────────────────────────────────────── */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/60 p-6">
-          <div className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1">
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Select Organization *</label>
-              {loadingOrgs ? (
-                <div className="flex items-center gap-2 py-2.5 text-slate-500 text-sm"><Loader2 size={16} className="animate-spin" /> Loading organizations...</div>
-              ) : (
-                <select
-                  value={orgId}
-                  onChange={(e) => setOrgId(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none text-sm transition-all appearance-none cursor-pointer"
-                >
-                  <option value="">Choose an organization...</option>
-                  {orgs.map(org => (
-                    <option key={org._id} value={org._id}>{org.name} — {org.city}, {org.state} ({org.companyCode})</option>
-                  ))}
-                </select>
-              )}
+        {/* Info banner */}
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 backdrop-blur-sm rounded-2xl border border-emerald-100/60 p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-1.5 bg-emerald-100 rounded-lg flex-shrink-0 mt-0.5">
+              <Building2 size={14} className="text-emerald-600" />
             </div>
-            <button
-              onClick={loadOrgFeatures}
-              disabled={loadingOrg || !orgId.trim()}
-              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-medium text-sm shadow-lg shadow-emerald-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-xl hover:-translate-y-0.5"
-            >
-              {loadingOrg ? <Loader2 size={16} className="animate-spin" /> : <Building2 size={16} />}
-              {loadingOrg ? 'Loading...' : 'Load Org'}
-            </button>
+            <div>
+              <p className="text-sm font-semibold text-emerald-800">🔧 Org Configuration</p>
+              <p className="text-xs text-emerald-600/80 mt-0.5">
+                Select an organization — its currently enabled features will load instantly from the existing data.
+                Toggle any feature on or off; changes are saved immediately.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Org Selector — no Load button needed, selection is instant */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/60 p-6">
+          <div className="flex-1">
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Select Organization *</label>
+            {loadingOrgs ? (
+              <div className="flex items-center gap-2 py-2.5 text-slate-500 text-sm">
+                <Loader2 size={16} className="animate-spin" /> Loading organizations...
+              </div>
+            ) : (
+              <select
+                value={orgId}
+                onChange={handleOrgChange}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none text-sm transition-all appearance-none cursor-pointer"
+              >
+                <option value="">Choose an organization...</option>
+                {orgs.map(org => (
+                  <option key={org._id} value={org._id}>
+                    {org.name} — {org.city}, {org.state} ({org.companyCode})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {orgIdApplied && (
             <div className="mt-3 flex items-center gap-3 text-sm text-emerald-700 bg-emerald-50 px-4 py-2.5 rounded-xl">
               <Info size={14} />
-              <span>Managing features for: <strong>{orgs.find(o => o._id === orgIdApplied)?.name || orgIdApplied}</strong></span>
-              <code className="ml-auto font-mono text-xs bg-emerald-100 px-1.5 py-0.5 rounded">{orgIdApplied}</code>
+              <span>
+                Managing features for: <strong>{orgs.find(o => o._id === orgIdApplied)?.name || orgIdApplied}</strong>
+              </span>
+              <code className="ml-auto font-mono text-xs bg-emerald-100 px-1.5 py-0.5 rounded">
+                {orgIdApplied}
+              </code>
             </div>
           )}
         </div>
 
-        {/* ─── Search ──────────────────────────────────────────────────────── */}
+        {/* Search */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/60 p-4">
           <div className="relative">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -237,7 +258,7 @@ export default function OrgFeaturesPage() {
           </div>
         </div>
 
-        {/* ─── Stats ───────────────────────────────────────────────────────── */}
+        {/* Stats */}
         {orgIdApplied && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/60 p-5">
@@ -255,7 +276,7 @@ export default function OrgFeaturesPage() {
           </div>
         )}
 
-        {/* ─── Feature Cards ───────────────────────────────────────────────── */}
+        {/* Feature table */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/60 overflow-hidden">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20">
@@ -270,7 +291,7 @@ export default function OrgFeaturesPage() {
             </div>
           ) : (
             <>
-              {/* Table Header */}
+              {/* Table header */}
               <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50/80 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 <div className="col-span-3 flex items-center gap-1 cursor-pointer hover:text-slate-700" onClick={() => toggleSort('name')}>
                   Feature <SortIcon field="name" />
@@ -284,7 +305,6 @@ export default function OrgFeaturesPage() {
                 <div className="col-span-1 text-center">Info</div>
               </div>
 
-              {/* Rows */}
               {filtered.map((feature) => {
                 const isEnabled = orgFeatureCodes.includes(feature.code);
                 const isToggling = togglingCode === feature.code;
@@ -295,7 +315,7 @@ export default function OrgFeaturesPage() {
                       {/* Name */}
                       <div className="col-span-3">
                         <div className="flex items-center gap-3">
-                          <div className={`w-2.5 h-2.5 rounded-full ${isEnabled ? 'bg-emerald-400 shadow-sm shadow-emerald-200' : 'bg-slate-300'}`} />
+                          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 transition-colors duration-300 ${isEnabled ? 'bg-emerald-400 shadow-sm shadow-emerald-200' : 'bg-slate-300'}`} />
                           <span className="font-semibold text-slate-800">{feature.name}</span>
                         </div>
                       </div>
@@ -312,7 +332,7 @@ export default function OrgFeaturesPage() {
                         <p className="text-sm text-slate-600 line-clamp-1">{feature.description || '—'}</p>
                       </div>
 
-                      {/* Status Badge */}
+                      {/* Status badge */}
                       <div className="col-span-2 flex justify-center">
                         {!orgIdApplied ? (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-semibold">
@@ -331,7 +351,7 @@ export default function OrgFeaturesPage() {
                         )}
                       </div>
 
-                      {/* Toggle Button */}
+                      {/* Toggle */}
                       <div className="col-span-1 flex justify-center">
                         <button
                           onClick={() => handleToggle(feature.code)}
@@ -375,7 +395,9 @@ export default function OrgFeaturesPage() {
                           </div>
                           <div>
                             <span className="text-xs font-semibold text-slate-400 uppercase">Created</span>
-                            <p className="text-slate-700 mt-0.5">{feature.createdAt ? new Date(feature.createdAt).toLocaleString() : '—'}</p>
+                            <p className="text-slate-700 mt-0.5">
+                              {feature.createdAt ? new Date(feature.createdAt).toLocaleString() : '—'}
+                            </p>
                           </div>
                           <div>
                             <span className="text-xs font-semibold text-slate-400 uppercase">Global Status</span>

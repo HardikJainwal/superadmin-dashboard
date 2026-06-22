@@ -44,8 +44,7 @@ export default function CorporateFeaturesPage() {
     }
   }, [showToast]);
 
-  useEffect(() => { fetchFeatures(); }, [fetchFeatures]);
-
+  useEffect(() => { fetchFeatures(); }, [fetchFeatures]); 
   // ── Form handlers ─────────────────────────────────────────────────────────────
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -163,6 +162,19 @@ export default function CorporateFeaturesPage() {
                 <Plus size={16} />
                 Add Feature
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Flow Guidance Banner */}
+        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 backdrop-blur-sm rounded-2xl border border-purple-100/60 p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-1.5 bg-purple-100 rounded-lg flex-shrink-0 mt-0.5">
+              <Zap size={14} className="text-purple-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-purple-800">⚙️ Initial Setup — Do this first</p>
+              <p className="text-xs text-purple-600/80 mt-0.5">Features are <strong>platform-wide capabilities</strong>. Create them here first, then enable them for specific organizations in the <strong>Org Features</strong> page.</p>
             </div>
           </div>
         </div>

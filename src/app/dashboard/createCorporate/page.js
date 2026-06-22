@@ -39,7 +39,7 @@ const COACH_TYPES = [
 ];
 
 const INITIAL_FORM = {
-  uid: '',
+  // uid: '',
   name: '',
   Address: '',
   city: '',
@@ -211,7 +211,20 @@ export default function CreateCorporatePage() {
           </div>
         </div>
 
-        {/* ── Success State ── */}
+        {/* Prerequisites Banner */}
+        {!createdOrg && (
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 backdrop-blur-sm rounded-2xl border border-amber-200/60 p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-1.5 bg-amber-100 rounded-lg flex-shrink-0 mt-0.5">
+                <Building2 size={14} className="text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-amber-800">🏢 Step ① — Create Organization First</p>
+                <p className="text-xs text-amber-600/80 mt-0.5"><strong>Before you start:</strong> Make sure Features and Permissions are already set up in the Initial Setup section. After creating the org, you&apos;ll configure limits → create admin → add users.</p>
+              </div>
+            </div>
+          </div>
+        )}        {/* ── Success State ── */}
         {createdOrg ? (
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/60 overflow-hidden">
             <div className="p-8 text-center">

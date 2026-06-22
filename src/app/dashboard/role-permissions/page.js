@@ -200,6 +200,19 @@ export default function RolePermissionsPage() {
           </div>
         </div>
 
+        {/* Flow Guidance Banner */}
+        <div className="bg-gradient-to-r from-indigo-50 to-violet-50 backdrop-blur-sm rounded-2xl border border-indigo-100/60 p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-1.5 bg-indigo-100 rounded-lg flex-shrink-0 mt-0.5">
+              <UserCog size={14} className="text-indigo-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-indigo-800">🔧 Org Configuration</p>
+              <p className="text-xs text-indigo-600/80 mt-0.5">Assign permissions to roles. <strong>Permissions</strong> must be created first in the 🛡️ Permissions page (Initial Setup), and <strong>roles</strong> must be created in the 👥 User Roles page.</p>
+            </div>
+          </div>
+        </div>
+
         {/* ─── Org & Role Selector ──────────────────────────────────────── */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/60 p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">

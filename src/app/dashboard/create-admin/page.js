@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  AlertCircle, CheckCircle2, UserCog, Building2, Mail, Shield,
+  AlertCircle, CheckCircle2, UserCog, Building2, Mail, Shield, User,
   ArrowRight, ArrowLeft, Plus, Loader2
 } from 'lucide-react';
 import { createOrgAdmin, getAllOrgs } from '@/lib/corporateService';
@@ -21,6 +21,8 @@ function CreateAdminPageInner() {
   const [toast, setToast] = useState(null);
 
   const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
     email: '',
     schoolId: prefilledSchoolId,
     accessType: 'owner'
@@ -56,6 +58,10 @@ function CreateAdminPageInner() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.firstName || !formData.lastName) {
+      showToast('error', 'First Name and Last Name are required.');
+      return;
+    }
     if (!formData.email || !formData.schoolId) {
       showToast('error', 'Email and Organization are required.');
       return;
@@ -70,9 +76,10 @@ function CreateAdminPageInner() {
       const data = await createOrgAdmin(formData);
       const adminId = data?.data?._id || data?.admin?._id || data?._id || data?.data?.id || '';
       const adminEmail = formData.email;
+      const adminName = `${formData.firstName} ${formData.lastName}`.trim();
 
-      setCreatedAdmin({ id: adminId, email: adminEmail, raw: data });
-      showToast('success', `Admin "${adminEmail}" created successfully!`);
+      setCreatedAdmin({ id: adminId, email: adminEmail, name: adminName, raw: data });
+      showToast('success', `Admin "${adminName}" created successfully!`);
     } catch (err) {
       showToast('error', err.message);
     } finally {
@@ -82,7 +89,7 @@ function CreateAdminPageInner() {
 
   const handleCreateAnother = () => {
     setCreatedAdmin(null);
-    setFormData({ email: '', schoolId: prefilledSchoolId || '', accessType: 'owner' });
+    setFormData({ firstName: '', lastName: '', email: '', schoolId: prefilledSchoolId || '', accessType: 'owner' });
   };
 
   const handleGoToUser = () => {
@@ -164,8 +171,11 @@ function CreateAdminPageInner() {
                 <CheckCircle2 size={32} className="text-emerald-600" />
               </div>
               <h2 className="text-2xl font-bold text-slate-800">Admin Created!</h2>
-              <p className="text-slate-500 mt-2">
-                <span className="font-semibold text-slate-700">{createdAdmin.email}</span> has been assigned as{' '}
+              {createdAdmin.name && (
+                <p className="text-lg font-semibold text-slate-700 mt-1">{createdAdmin.name}</p>
+              )}
+              <p className="text-slate-500 mt-1">
+                <span className="font-medium text-slate-600">{createdAdmin.email}</span> has been assigned as{' '}
                 <span className="font-semibold text-purple-600">{formData.accessType}</span> admin.
               </p>
               {createdAdmin.id && (
@@ -225,6 +235,40 @@ function CreateAdminPageInner() {
                   )}
                 </div>
               )}
+
+              {/* Name Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                    <User size={14} className="text-purple-500" />
+                    First Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    required
+                    placeholder="Anjali"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none text-sm transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                    <User size={14} className="text-purple-500" />
+                    Last Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    required
+                    placeholder="Mehta"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-400 focus:border-transparent outline-none text-sm transition-all"
+                  />
+                </div>
+              </div>
 
               {/* Email */}
               <div>

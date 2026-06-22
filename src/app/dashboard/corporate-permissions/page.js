@@ -179,6 +179,19 @@ export default function CorporatePermissionsPage() {
           </div>
         </div>
 
+        {/* Flow Guidance Banner */}
+        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 backdrop-blur-sm rounded-2xl border border-blue-100/60 p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-1.5 bg-blue-100 rounded-lg flex-shrink-0 mt-0.5">
+              <Shield size={14} className="text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-blue-800">⚙️ Initial Setup — Do this first</p>
+              <p className="text-xs text-blue-600/80 mt-0.5">Permissions define <strong>what actions users can perform</strong>. Create them here first, then assign them to roles in the <strong>Role Permissions</strong> page.</p>
+            </div>
+          </div>
+        </div>
+
         {/* ─── Search + Category Filter ────────────────────────────────────── */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white/60 p-4 space-y-3">
           <div className="relative">

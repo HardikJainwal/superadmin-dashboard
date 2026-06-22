@@ -13,9 +13,42 @@ const getAuthHeader = () => {
 };
 
 
+const getAllSchools = async () => {
+  try {
+    let allSchools = [];
+    let currentPage = 1;
+    let totalPages = 1;
+
+    while (currentPage <= totalPages) {
+      const response = await fetch(`${API_BASE_URL}/superAdmin/schools?page=${currentPage}&limit=100`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader(),
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to fetch schools (${response.status})`);
+      }
+
+      const result = await response.json();
+      allSchools = [...allSchools, ...(result.schools || result.data || [])];
+      totalPages = result.totalPages || 1;
+      currentPage++;
+    }
+
+    return { success: true, data: allSchools, total: allSchools.length };
+  } catch (error) {
+    console.error('Error fetching schools:', error);
+    return { success: false, error: error.message || 'Failed to fetch schools', data: [] };
+  }
+};
 
 
 const createProgram = async (programData) => {
+
   try {
     console.log('📤 Sending payload:', programData);
 
@@ -43,4 +76,4 @@ const createProgram = async (programData) => {
 };
 
 
-export { createProgram };
+export { createProgram, getAllSchools };
