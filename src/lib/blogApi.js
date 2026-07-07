@@ -3,15 +3,45 @@ const BLOG_API_BASE = 'https://api.devdoot.org/v1/api/blogs';
 // ─── Blog CRUD ────────────────────────────────────────────
 
 /**
- * Fetch all blogs, optionally filtered by site.
+ * Fetch one page of blogs, optionally filtered by site.
+ * Returns { blogs: [...], pagination: { page, limit, total } }
+ * @param {'main'|'new_site'|''} site
+ * @param {number} page  1-based page number
+ * @param {number} limit max 50 per the API
+ */
+export async function fetchBlogs(site = '', page = 1, limit = 50) {
+  const params = new URLSearchParams();
+  if (site) params.set('site', site);
+  params.set('page', String(page));
+  params.set('limit', String(limit));
+  const url = `${BLOG_API_BASE}?${params.toString()}`;
+  const res = await fetch(url, { cache: 'no-store' });
+  const json = await res.json();
+  if (!res.ok || !json.success) throw new Error(json.message || 'Failed to fetch blogs');
+  // API returns { success, data: { blogs: [...], pagination: { page, limit, total } } }
+  return {
+    blogs: json.data?.blogs ?? [],
+    pagination: json.data?.pagination ?? { page, limit, total: 0 },
+  };
+}
+
+/**
+ * Fetch ALL blogs across all pages (for admin list view).
+ * Iterates pages automatically using limit=50 (API max).
  * @param {'main'|'new_site'|''} site
  */
-export async function fetchBlogs(site = '') {
-  const url = site ? `${BLOG_API_BASE}?site=${site}` : BLOG_API_BASE;
-  const res = await fetch(url, { cache: 'no-store' });
-  const data = await res.json();
-  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to fetch blogs');
-  return data;
+export async function fetchAllBlogs(site = '') {
+  const firstPage = await fetchBlogs(site, 1, 50);
+  const { blogs, pagination } = firstPage;
+  const { total, limit } = pagination;
+  const totalPages = Math.ceil(total / limit);
+
+  if (totalPages <= 1) return blogs;
+
+  const rest = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, i) => fetchBlogs(site, i + 2, 50))
+  );
+  return [...blogs, ...rest.flatMap(r => r.blogs)];
 }
 
 /**
@@ -45,9 +75,9 @@ export async function createBlog(payload) {
 }
 
 /**
- * Update an existing blog post.
+ * Update an existing blog post (full replace).
  * @param {string} id - Blog ID
- * @param {object} payload - Fields to update (e.g. { publishTo: ['main','new_site'] })
+ * @param {object} payload - Fields to update
  */
 export async function updateBlog(id, payload) {
   const res = await fetch(`${BLOG_API_BASE}/blog/${id}`, {
@@ -57,6 +87,22 @@ export async function updateBlog(id, payload) {
   });
   const data = await res.json();
   if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update blog');
+  return data;
+}
+
+/**
+ * Partially update an existing blog post (PATCH).
+ * @param {string} id - Blog ID
+ * @param {object} payload - Partial fields to update (e.g. { publishTo, seoTitle, blogPostSchema, ... })
+ */
+export async function patchBlog(id, payload) {
+  const res = await fetch(`${BLOG_API_BASE}/blog/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) throw new Error(data.message || 'Failed to patch blog');
   return data;
 }
 

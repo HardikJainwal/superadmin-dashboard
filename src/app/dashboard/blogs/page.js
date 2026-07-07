@@ -3,12 +3,11 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Eye, Send, Plus, X, Loader2, ImageIcon, Tag, Globe, Monitor, Layout,
   FileText, List, FolderOpen, Edit3, Check, ChevronDown, ExternalLink, RefreshCw,
-  Search, Filter,
-  MousePointerSquareDashed
+  Search, Filter, Save, AlertCircle, Code2, ChevronUp
 } from 'lucide-react';
 
 import {
-  fetchBlogs, createBlog, updateBlog,
+  fetchAllBlogs, createBlog, updateBlog, patchBlog,
   fetchCategories as apiFetchCategories, createCategory, updateCategory
 } from '@/lib/blogApi';
 import { formatCoachTimings } from '@/lib/assignCoach';
@@ -140,6 +139,74 @@ function CategorySiteSelector({ value = 'both', onChange }) {
 
 
 
+// ─── Reusable: JSON Schema Editor ────────────────────────
+function SchemaJsonEditor({ label, value, onChange, placeholder }) {
+  const [raw, setRaw] = useState(
+    value ? (typeof value === 'string' ? value : JSON.stringify(value, null, 2)) : ''
+  );
+  const [error, setError] = useState(null);
+  const [collapsed, setCollapsed] = useState(true);
+
+  const handleChange = (text) => {
+    setRaw(text);
+    if (!text.trim()) {
+      setError(null);
+      onChange(null);
+      return;
+    }
+    try {
+      onChange(JSON.parse(text));
+      setError(null);
+    } catch {
+      setError('Invalid JSON');
+      onChange(null);
+    }
+  };
+
+  return (
+    <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setCollapsed(c => !c)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition text-sm font-semibold text-gray-700"
+      >
+        <span className="flex items-center gap-2">
+          <Code2 size={14} className="text-indigo-500" />
+          {label}
+          {value && !error && (
+            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Set</span>
+          )}
+          {error && (
+            <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">Error</span>
+          )}
+        </span>
+        {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+      </button>
+      {!collapsed && (
+        <div className="p-3 bg-white">
+          <textarea
+            value={raw}
+            onChange={(e) => handleChange(e.target.value)}
+            rows={8}
+            placeholder={placeholder || `Paste ${label} JSON here...`}
+            className={`w-full px-3 py-2.5 font-mono text-xs border-2 rounded-lg focus:outline-none transition resize-y
+              ${error ? 'border-red-400 bg-red-50' : 'border-gray-200 focus:border-indigo-500'}`}
+          />
+          {error && (
+            <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+              <AlertCircle size={12} /> {error} — fix JSON before saving
+            </p>
+          )}
+          {!error && raw.trim() && (
+            <p className="text-xs text-green-600 mt-1">✓ Valid JSON</p>
+          )}
+          <p className="text-xs text-gray-400 mt-1">Leave empty to omit this schema from the blog.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MAIN PAGE COMPONENT
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -158,11 +225,14 @@ const BlogManagement = () => {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [siteFilter, setSiteFilter] = useState('');
 
-  const loadCategories = useCallback(async (site) => {
+const loadCategories = useCallback(async (site) => {
     setCategoriesLoading(true);
     try {
       const result = await apiFetchCategories(site);
-      setCategories(Array.isArray(result.data) ? result.data : []);
+      const raw = Array.isArray(result.data) ? result.data : [];
+      const seen = new Map();
+      raw.forEach(c => seen.set(c._id || c.id || c.name, c));
+      setCategories(Array.from(seen.values()));
     } catch {
       setCategories([]);
     } finally {
@@ -269,21 +339,24 @@ const BlogManagement = () => {
 // TAB 1: BLOG LIST
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function BlogListTab({ siteFilter }) {
+function BlogListTab({ siteFilter, categories }) {
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [editingBlog, setEditingBlog] = useState(null);
-  const [editPublishTo, setEditPublishTo] = useState(['main']);
+  const [editModal, setEditModal] = useState(null); // { blog } or null
   const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState(null);
 
-  const load = useCallback(async () => {
+ const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchBlogs(siteFilter);
-      setBlogs(Array.isArray(result.data) ? result.data : []);
+      const allBlogs = await fetchAllBlogs(siteFilter);
+      const raw = Array.isArray(allBlogs) ? allBlogs : [];
+      const seen = new Map();
+      raw.forEach(b => seen.set(b._id || b.id, b));
+      setBlogs(Array.from(seen.values()));
     } catch (err) {
       setError(err.message);
       setBlogs([]);
@@ -294,14 +367,38 @@ function BlogListTab({ siteFilter }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleUpdatePublishTo = async (blogId) => {
+  const openEdit = (blog) => {
+    setEditModal({
+      id: blog._id || blog.id,
+      title: blog.title || '',
+       content: blog.content || '',
+      slug: blog.slug || '',
+      category: (typeof blog.category === 'object' ? blog.category.name : blog.category) || '',
+      imageUrl: blog.imageUrl || '',
+      imageAlt: blog.imageAlt || '',
+      seoTitle: blog.seoTitle || '',
+      metaDescription: blog.metaDescription || '',
+      keyphrase: blog.keyphrase || '',
+      publishTo: blog.publishTo || ['main'],
+      blogPostSchema: blog.blogPostSchema || null,
+      faqSchema: blog.faqSchema || null,
+      breadcrumbSchema: blog.breadcrumbSchema || null,
+    });
+    setSaveMsg(null);
+  };
+
+  const handleSave = async () => {
+    if (!editModal) return;
     setSaving(true);
+    setSaveMsg(null);
     try {
-      await updateBlog(blogId, { publishTo: editPublishTo });
-      setEditingBlog(null);
+      const { id, ...payload } = editModal;
+      await patchBlog(id, payload);
+      setSaveMsg({ success: true, text: 'Blog updated successfully!' });
       load();
+      setTimeout(() => setEditModal(null), 1200);
     } catch (err) {
-      alert('Failed to update: ' + err.message);
+      setSaveMsg({ success: false, text: 'Failed to update: ' + err.message });
     } finally {
       setSaving(false);
     }
@@ -333,118 +430,312 @@ function BlogListTab({ siteFilter }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      {/* Search Bar */}
-      <div className="p-5 border-b border-gray-100">
-        <div className="relative max-w-md">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search blogs by title or category…"
-            className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition text-sm"
-          />
+    <>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* Search Bar */}
+        <div className="p-5 border-b border-gray-100">
+          <div className="relative max-w-md">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search blogs by title or category…"
+              className="w-full pl-10 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition text-sm"
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-2">{filteredBlogs.length} blog{filteredBlogs.length !== 1 ? 's' : ''} found</p>
         </div>
-        <p className="text-xs text-gray-400 mt-2">{filteredBlogs.length} blog{filteredBlogs.length !== 1 ? 's' : ''} found</p>
-      </div>
 
-      {/* Blog Rows */}
-      {filteredBlogs.length === 0 ? (
-        <div className="p-16 text-center">
-          <FileText size={48} className="mx-auto text-gray-200 mb-4" />
-          <p className="text-gray-500 font-medium">No blogs found</p>
-          <p className="text-gray-400 text-sm mt-1">Try a different search or site filter</p>
-        </div>
-      ) : (
-        <div className="divide-y divide-gray-50">
-          {filteredBlogs.map(blog => {
-            const isEditing = editingBlog === (blog._id || blog.id);
-            const blogId = blog._id || blog.id;
-            const publishTo = blog.publishTo || ['main'];
-            return (
-              <div key={blogId} className={`p-5 transition-colors ${isEditing ? 'bg-indigo-50/50' : 'hover:bg-gray-50/50'}`}>
-                <div className="flex items-start gap-4">
-                  {/* Thumbnail */}
-                  {blog.imageUrl ? (
-                    <img
-                      src={blog.imageUrl}
-                      alt={blog.imageAlt || blog.title}
-                      className="w-20 h-14 object-cover rounded-lg flex-shrink-0 border border-gray-200"
-                      onError={(e) => { e.target.style.display = 'none'; }}
-                    />
-                  ) : (
-                    <div className="w-20 h-14 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <ImageIcon size={20} className="text-gray-300" />
-                    </div>
-                  )}
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate text-sm">{blog.title}</h3>
-                    <div className="flex items-center gap-3 mt-1.5">
-                      {blog.category && (
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
-                          {typeof blog.category === 'object' ? blog.category.name : blog.category}
-                        </span>
-                      )}
-                      <span className="text-xs text-gray-400">
-                        {blog.createdAt ? new Date(blog.createdAt).toLocaleDateString('en-US', {
-                          month: 'short', day: 'numeric', year: 'numeric'
-                        }) : '—'}
-                      </span>
-                    </div>
-                    <div className="mt-2">
-                      <SiteBadge sites={publishTo} />
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {!isEditing ? (
-                      <button
-                        onClick={() => {
-                          setEditingBlog(blogId);
-                          setEditPublishTo([...publishTo]);
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
-                      >
-                        <Edit3 size={12} />
-                        Edit Sites
-                      </button>
+        {/* Blog Rows */}
+        {filteredBlogs.length === 0 ? (
+          <div className="p-16 text-center">
+            <FileText size={48} className="mx-auto text-gray-200 mb-4" />
+            <p className="text-gray-500 font-medium">No blogs found</p>
+            <p className="text-gray-400 text-sm mt-1">Try a different search or site filter</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {filteredBlogs.map(blog => {
+              const blogId = blog._id || blog.id;
+              const publishTo = blog.publishTo || ['main'];
+              return (
+                <div key={blogId} className="p-5 hover:bg-gray-50/50 transition-colors">
+                  <div className="flex items-start gap-4">
+                    {/* Thumbnail */}
+                    {blog.imageUrl ? (
+                      <img
+                        src={blog.imageUrl}
+                        alt={blog.imageAlt || blog.title}
+                        className="w-20 h-14 object-cover rounded-lg flex-shrink-0 border border-gray-200"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
                     ) : (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleUpdatePublishTo(blogId)}
-                          disabled={saving}
-                          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
-                        >
-                          {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                          Save
-                        </button>
-                        <button
-                          onClick={() => setEditingBlog(null)}
-                          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
-                        >
-                          <X size={12} />
-                        </button>
+                      <div className="w-20 h-14 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <ImageIcon size={20} className="text-gray-300" />
                       </div>
                     )}
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 truncate text-sm">{blog.title}</h3>
+                      <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                        {blog.category && (
+                          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+                            {typeof blog.category === 'object' ? blog.category.name : blog.category}
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-400">
+                          {blog.createdAt ? new Date(blog.createdAt).toLocaleDateString('en-US', {
+                            month: 'short', day: 'numeric', year: 'numeric'
+                          }) : '—'}
+                        </span>
+                        {/* SEO Schema indicators */}
+                        <div className="flex gap-1">
+                          {blog.blogPostSchema && <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-medium">BlogPost</span>}
+                          {blog.faqSchema && <span className="text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-medium">FAQ</span>}
+                          {blog.breadcrumbSchema && <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium">Breadcrumb</span>}
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <SiteBadge sites={publishTo} />
+                      </div>
+                    </div>
+
+                    {/* Edit Button */}
+                    <div className="flex-shrink-0">
+                      <button
+                        onClick={() => openEdit(blog)}
+                        className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition"
+                      >
+                        <Edit3 size={12} />
+                        Edit Blog
+                      </button>
+                    </div>
                   </div>
                 </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-                {/* Inline Edit Panel */}
-                {isEditing && (
-                  <div className="mt-4 ml-24 p-4 bg-white rounded-xl border-2 border-indigo-200 shadow-sm">
-                    <PublishToSelector value={editPublishTo} onChange={setEditPublishTo} />
-                  </div>
-                )}
+      {/* ── Full Edit Modal ── */}
+      {editModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 pb-10 px-4 bg-black/40 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-200 my-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-t-2xl">
+              <div>
+                <h2 className="text-lg font-bold text-white">Edit Blog</h2>
+                <p className="text-indigo-100 text-xs mt-0.5 truncate max-w-xs">{editModal.title || 'Untitled'}</p>
               </div>
-            );
-          })}
+              <button
+                onClick={() => setEditModal(null)}
+                className="p-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+              {/* Save message */}
+              {saveMsg && (
+                <div className={`p-3 rounded-lg border-2 text-sm font-medium
+                  ${saveMsg.success ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                  {saveMsg.text}
+                </div>
+              )}
+
+              {/* Publish To */}
+              <div className="p-4 bg-gradient-to-r from-violet-50 to-indigo-50 rounded-xl border-2 border-indigo-200">
+                <PublishToSelector
+                  value={editModal.publishTo}
+                  onChange={(val) => setEditModal(p => ({ ...p, publishTo: val }))}
+                />
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Title <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={editModal.title}
+                  onChange={(e) => setEditModal(p => ({ ...p, title: e.target.value }))}
+                  className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition text-sm"
+                  placeholder="Blog title"
+                />
+              </div>
+
+              {/* Slug */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Slug (URL)</label>
+                <input
+                  type="text"
+                  value={editModal.slug}
+                  onChange={(e) => setEditModal(p => ({ ...p, slug: e.target.value }))}
+                  className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition text-sm bg-gray-50 font-mono"
+                  placeholder="your-blog-slug"
+                />
+              </div>
+
+              {/* Category + Thumbnail */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Category</label>
+                  <select
+                    value={editModal.category}
+                    onChange={(e) => setEditModal(p => ({ ...p, category: e.target.value }))}
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition text-sm"
+                  >
+                    <option value="">Select category</option>
+                    {categories.map(cat => (
+                      <option key={cat.id || cat._id || cat.name} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Thumbnail URL</label>
+                  <input
+                    type="text"
+                    value={editModal.imageUrl}
+                    onChange={(e) => setEditModal(p => ({ ...p, imageUrl: e.target.value }))}
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition text-sm"
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+
+              {/* Thumbnail Preview */}
+              {editModal.imageUrl && (
+                <div className="w-full h-32 rounded-lg overflow-hidden border border-gray-200">
+                  <img src={editModal.imageUrl} alt="Preview" className="w-full h-full object-cover" onError={(e) => { e.target.style.display='none'; }} />
+                </div>
+              )}
+              <div>
+  <label className="block text-sm font-semibold text-gray-700 mb-2">
+    Content
+  </label>
+
+  <textarea
+    rows={12}
+    value={editModal.content}
+    onChange={(e) =>
+      setEditModal(prev => ({
+        ...prev,
+        content: e.target.value,
+      }))
+    }
+    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none resize-y"
+  />
+</div>
+
+              {/* ── SEO Section ── */}
+              <div className="p-5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-indigo-200 space-y-4">
+                <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  SEO Settings
+                </h3>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">SEO Title</label>
+                  <input
+                    type="text"
+                    value={editModal.seoTitle}
+                    onChange={(e) => setEditModal(p => ({ ...p, seoTitle: e.target.value }))}
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition text-sm"
+                    placeholder="SEO optimized title"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Meta Description
+                    <span className="text-gray-400 font-normal ml-1">({(editModal.metaDescription || '').length}/160)</span>
+                  </label>
+                  <textarea
+                    value={editModal.metaDescription}
+                    onChange={(e) => setEditModal(p => ({ ...p, metaDescription: e.target.value }))}
+                    rows={2}
+                    maxLength={160}
+                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition text-sm resize-none"
+                    placeholder="Brief description for search engines (max 160 chars)"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Focus Keyphrase</label>
+                    <input
+                      type="text"
+                      value={editModal.keyphrase}
+                      onChange={(e) => setEditModal(p => ({ ...p, keyphrase: e.target.value }))}
+                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition text-sm"
+                      placeholder="e.g., Pet Wellness in India"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Image Alt Text</label>
+                    <input
+                      type="text"
+                      value={editModal.imageAlt}
+                      onChange={(e) => setEditModal(p => ({ ...p, imageAlt: e.target.value }))}
+                      className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition text-sm"
+                      placeholder="Descriptive alt text"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ── SEO Schema Fields ── */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                  <Code2 size={14} className="text-purple-500" />
+                  SEO Schema Markup (JSON-LD)
+                </h3>
+                <SchemaJsonEditor
+                  label="BlogPosting Schema"
+                  value={editModal.blogPostSchema}
+                  onChange={(val) => setEditModal(p => ({ ...p, blogPostSchema: val }))}
+                  placeholder={'{\n  "@context": "https://schema.org",\n  "@type": "BlogPosting",\n  "headline": "...",\n  "author": { "@type": "Person", "name": "..." }\n}'}
+                />
+                <SchemaJsonEditor
+                  label="FAQ Schema"
+                  value={editModal.faqSchema}
+                  onChange={(val) => setEditModal(p => ({ ...p, faqSchema: val }))}
+                  placeholder={'{\n  "@context": "https://schema.org",\n  "@type": "FAQPage",\n  "mainEntity": []\n}'}
+                />
+                <SchemaJsonEditor
+                  label="Breadcrumb Schema"
+                  value={editModal.breadcrumbSchema}
+                  onChange={(val) => setEditModal(p => ({ ...p, breadcrumbSchema: val }))}
+                  placeholder={'{\n  "@context": "https://schema.org",\n  "@type": "BreadcrumbList",\n  "itemListElement": []\n}'}
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+              <button
+                onClick={() => setEditModal(null)}
+                className="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition text-sm font-semibold disabled:opacity-50 shadow-md shadow-indigo-200"
+              >
+                {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -465,6 +756,9 @@ function BlogCreateTab({ categories, categoriesLoading, onCategoryCreated }) {
     keyphrase: '',
     imageAlt: '',
     publishTo: ['main'],
+    blogPostSchema: null,
+    faqSchema: null,
+    breadcrumbSchema: null,
   });
 
   const [showPreview, setShowPreview] = useState(false);
@@ -612,6 +906,9 @@ function BlogCreateTab({ categories, categoriesLoading, onCategoryCreated }) {
         keyphrase: formData.keyphrase,
         imageAlt: formData.imageAlt,
         publishTo: formData.publishTo,
+        blogPostSchema: formData.blogPostSchema || null,
+        faqSchema: formData.faqSchema || null,
+        breadcrumbSchema: formData.breadcrumbSchema || null,
       };
 
       const data = await createBlog(payload);
@@ -629,6 +926,9 @@ function BlogCreateTab({ categories, categoriesLoading, onCategoryCreated }) {
         keyphrase: '',
         imageAlt: '',
         publishTo: ['main'],
+        blogPostSchema: null,
+        faqSchema: null,
+        breadcrumbSchema: null,
       });
 
       if (quillRef.current) {
@@ -924,6 +1224,33 @@ function BlogCreateTab({ categories, categoriesLoading, onCategoryCreated }) {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* ── SEO Schema Markup ── */}
+        <div className="mb-6 space-y-3">
+          <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+            <Code2 size={18} className="text-purple-500" />
+            SEO Schema Markup (JSON-LD)
+            <span className="text-xs font-normal text-gray-400">Optional</span>
+          </h3>
+          <SchemaJsonEditor
+            label="BlogPosting Schema"
+            value={formData.blogPostSchema}
+            onChange={(val) => setFormData(prev => ({ ...prev, blogPostSchema: val }))}
+            placeholder={'{\n  "@context": "https://schema.org",\n  "@type": "BlogPosting",\n  "headline": "...",\n  "author": { "@type": "Person", "name": "..." }\n}'}
+          />
+          <SchemaJsonEditor
+            label="FAQ Schema"
+            value={formData.faqSchema}
+            onChange={(val) => setFormData(prev => ({ ...prev, faqSchema: val }))}
+            placeholder={'{\n  "@context": "https://schema.org",\n  "@type": "FAQPage",\n  "mainEntity": []\n}'}
+          />
+          <SchemaJsonEditor
+            label="Breadcrumb Schema"
+            value={formData.breadcrumbSchema}
+            onChange={(val) => setFormData(prev => ({ ...prev, breadcrumbSchema: val }))}
+            placeholder={'{\n  "@context": "https://schema.org",\n  "@type": "BreadcrumbList",\n  "itemListElement": []\n}'}
+          />
         </div>
 
         {/* ── Rich Text Editor (Quill) ── */}
