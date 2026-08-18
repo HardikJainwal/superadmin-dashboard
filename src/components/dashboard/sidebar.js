@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   UserCog,
   UserPlus,
+  Calendar,
   icons
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -68,9 +69,10 @@ const menuItems = [
     items: [
       { id: 'org-features', label: 'Org Features', icon: Zap, href: '/dashboard/org-features' },
       { id: 'user-roles', label: 'User Roles', icon: Users, href: '/dashboard/user-roles' },
-      { id: 'user-roles', label: 'Corporate Community', icon: Users, href: '/dashboard/corporate-community' },
+      { id: 'corporate-community', label: 'Corporate Community', icon: Users, href: '/dashboard/corporate-community' },
       { id: 'role-permissions', label: 'Role Permissions', icon: ShieldCheck, href: '/dashboard/role-permissions' },
       { id: 'corporate-resources', label: 'Resources', icon: FileText, href: '/dashboard/corporate-resources' },
+      { id: 'corporate-events', label: 'Create Event', icon: Calendar, href: '/dashboard/corporate-events' },
       { id: 'corporate-coach-assign', label: 'Coach Assignment', icon: Stethoscope, href: '/dashboard/corporate-coach-assign' },
     ]
   },
