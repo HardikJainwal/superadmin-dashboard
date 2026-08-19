@@ -17,7 +17,13 @@ export const createEvent = async (formData) => {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `Failed to create event (${response.status})`);
+    const errMsg =
+      errorData.message ||
+      errorData.error ||
+      errorData.msg ||
+      (typeof errorData.details === 'string' ? errorData.details : null) ||
+      `Failed to create event (${response.status})`;
+    throw new Error(errMsg);
   }
 
   return response.json();

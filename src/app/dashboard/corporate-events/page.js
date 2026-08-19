@@ -40,7 +40,7 @@ const INITIAL_FORM = {
   audience: 'restricted',
   startTime: '',
   endTime: '',
-  size: '100',
+  size: '',
   priceType: 'free', // "free" or "paid"
   price: '',
   currency: 'INR',
@@ -64,6 +64,13 @@ export default function CorporateEventsPage() {
   const [toast, setToast] = useState(null);
   const [createdEvent, setCreatedEvent] = useState(null);
   const [showJsonPreview, setShowJsonPreview] = useState(false);
+
+  // Compute today's datetime-local min string (no past dates)
+  const nowLocal = (() => {
+    const d = new Date();
+    d.setSeconds(0, 0);
+    return d.toISOString().slice(0, 16);
+  })();
 
   // Input builders state
   const [newFeature, setNewFeature] = useState('');
@@ -112,7 +119,7 @@ export default function CorporateEventsPage() {
     setPhotoPreview(null);
   };
 
-  // Features builder
+  // Features builder & updater
   const addFeature = () => {
     if (!newFeature.trim()) return;
     setFormData((prev) => ({
@@ -122,6 +129,14 @@ export default function CorporateEventsPage() {
     setNewFeature('');
   };
 
+  const updateFeature = (index, value) => {
+    setFormData((prev) => {
+      const updated = [...prev.features];
+      updated[index] = value;
+      return { ...prev, features: updated };
+    });
+  };
+
   const removeFeature = (index) => {
     setFormData((prev) => ({
       ...prev,
@@ -129,17 +144,32 @@ export default function CorporateEventsPage() {
     }));
   };
 
-  // Agendas builder
+  // Agendas builder & updater
   const addAgenda = () => {
     if (!newAgenda.title.trim()) {
       showToast('error', 'Agenda item requires at least a title');
       return;
+    }
+    if (newAgenda.time.trim()) {
+      const agendaDate = new Date(newAgenda.time);
+      if (!isNaN(agendaDate.getTime()) && agendaDate < new Date()) {
+        showToast('error', 'Agenda date & time cannot be in the past');
+        return;
+      }
     }
     setFormData((prev) => ({
       ...prev,
       agendas: [...prev.agendas, { ...newAgenda }]
     }));
     setNewAgenda({ time: '', title: '', description: '' });
+  };
+
+  const updateAgenda = (index, field, value) => {
+    setFormData((prev) => {
+      const updated = [...prev.agendas];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, agendas: updated };
+    });
   };
 
   const removeAgenda = (index) => {
@@ -149,14 +179,19 @@ export default function CorporateEventsPage() {
     }));
   };
 
-  // Roadmap builder
+  // Roadmap builder & updater
   const addRoadmap = () => {
     if (!newRoadmap.title.trim()) {
       showToast('error', 'Roadmap item requires a title');
       return;
     }
     if (!newRoadmap.time.trim()) {
-      showToast('error', 'Roadmap item requires a time');
+      showToast('error', 'Roadmap step requires a valid Date & Time');
+      return;
+    }
+    const stepDate = new Date(newRoadmap.time);
+    if (!isNaN(stepDate.getTime()) && stepDate < new Date()) {
+      showToast('error', 'Roadmap step date & time cannot be in the past');
       return;
     }
     setFormData((prev) => ({
@@ -175,6 +210,14 @@ export default function CorporateEventsPage() {
       title: '',
       description: '',
       timeTaken: ''
+    });
+  };
+
+  const updateRoadmap = (index, field, value) => {
+    setFormData((prev) => {
+      const updated = [...prev.roadMap];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, roadMap: updated };
     });
   };
 
@@ -206,8 +249,16 @@ export default function CorporateEventsPage() {
       showToast('error', 'Start Time is required');
       return;
     }
+    if (new Date(formData.startTime) < new Date()) {
+      showToast('error', 'Event Start Time cannot be in the past');
+      return;
+    }
     if (!formData.endTime) {
       showToast('error', 'End Time is required');
+      return;
+    }
+    if (new Date(formData.endTime) <= new Date(formData.startTime)) {
+      showToast('error', 'End Time must be after Start Time');
       return;
     }
     if (!formData.size) {
@@ -216,6 +267,10 @@ export default function CorporateEventsPage() {
     }
     if (!formData.location.trim()) {
       showToast('error', 'Location is required');
+      return;
+    }
+    if (!formData.link || !formData.link.trim()) {
+      showToast('error', 'Event Join / Registration Link is required');
       return;
     }
     if (formData.priceType === 'paid') {
@@ -256,16 +311,83 @@ export default function CorporateEventsPage() {
         data.append('photo', formData.photo);
       }
 
-      // Stringified JSON fields - only append when non-empty
-      if (Array.isArray(formData.features) && formData.features.length > 0) {
-        data.append('features', JSON.stringify(formData.features));
+      // Stringified JSON fields - append when non-empty, auto-capturing any pending input field
+      const finalFeatures = [...(formData.features || [])];
+      if (newFeature.trim()) {
+        finalFeatures.push(newFeature.trim());
       }
-      if (Array.isArray(formData.roadMap) && formData.roadMap.length > 0) {
-        data.append('roadMap', JSON.stringify(formData.roadMap));
+      if (finalFeatures.length > 0) {
+        data.append('features', JSON.stringify(finalFeatures));
       }
-      if (Array.isArray(formData.agendas) && formData.agendas.length > 0) {
-        data.append('agendas', JSON.stringify(formData.agendas));
+
+      const finalRoadMap = [...(formData.roadMap || [])];
+      if (newRoadmap.title.trim()) {
+        finalRoadMap.push({
+          step: finalRoadMap.length + 1,
+          time: newRoadmap.time.trim(),
+          title: newRoadmap.title.trim(),
+          description: newRoadmap.description.trim(),
+          timeTaken: newRoadmap.timeTaken.trim()
+        });
       }
+      if (finalRoadMap.length > 0) {
+        // Enforce no past date/time for roadmap steps
+        for (const item of finalRoadMap) {
+          if (item.time) {
+            const stepD = new Date(item.time);
+            if (!isNaN(stepD.getTime()) && stepD < new Date()) {
+              showToast('error', `Roadmap step "${item.title || 'Step'}" date & time cannot be in the past`);
+              setLoading(false);
+              return;
+            }
+          }
+        }
+        const cleanedRoadMap = finalRoadMap.map((item, idx) => {
+          let timeVal = item.time ? String(item.time).trim() : '';
+          // If time is only hh:mm without a date (e.g. "10:00"), auto-combine with start date or today's date
+          if (timeVal && !timeVal.includes('-') && timeVal.includes(':')) {
+            const baseDate = formData.startTime ? formData.startTime.split('T')[0] : new Date().toISOString().split('T')[0];
+            timeVal = `${baseDate}T${timeVal}`;
+          }
+          return {
+            step: Number(item.step) || idx + 1,
+            time: timeVal,
+            title: item.title ? String(item.title).trim() : '',
+            description: item.description ? String(item.description).trim() : '',
+            timeTaken: item.timeTaken ? String(item.timeTaken).trim() : ''
+          };
+        });
+        data.append('roadMap', JSON.stringify(cleanedRoadMap));
+      }
+
+      const finalAgendas = [...(formData.agendas || [])];
+      if (newAgenda.title.trim()) {
+        finalAgendas.push({
+          time: newAgenda.time.trim(),
+          title: newAgenda.title.trim(),
+          description: newAgenda.description.trim()
+        });
+      }
+      if (finalAgendas.length > 0) {
+        // Enforce no past date/time for agendas if date/time is specified
+        for (const item of finalAgendas) {
+          if (item.time) {
+            const agendaD = new Date(item.time);
+            if (!isNaN(agendaD.getTime()) && agendaD < new Date()) {
+              showToast('error', `Agenda item "${item.title || 'Agenda'}" date & time cannot be in the past`);
+              setLoading(false);
+              return;
+            }
+          }
+        }
+        const cleanedAgendas = finalAgendas.map((item) => ({
+          time: item.time ? String(item.time).trim() : '',
+          title: item.title ? String(item.title).trim() : '',
+          description: item.description ? String(item.description).trim() : ''
+        }));
+        data.append('agendas', JSON.stringify(cleanedAgendas));
+      }
+
       if (
         formData.contactInfo &&
         (formData.contactInfo.email?.trim() || formData.contactInfo.phone?.trim() || formData.contactInfo.address?.trim())
@@ -288,6 +410,9 @@ export default function CorporateEventsPage() {
     setFormData(INITIAL_FORM);
     setPhotoPreview(null);
     setCreatedEvent(null);
+    setNewFeature('');
+    setNewAgenda({ time: '', title: '', description: '' });
+    setNewRoadmap({ step: 1, time: '', title: '', description: '', timeTaken: '' });
   };
 
   return (
@@ -312,64 +437,13 @@ export default function CorporateEventsPage() {
               <div className="p-2.5 bg-purple-100 text-purple-600 rounded-xl">
                 <Calendar size={26} />
               </div>
-              Create Corporate Event
+              Create Event
             </h1>
             <p className="text-slate-500 text-xs md:text-sm mt-1">
-              POST Endpoint: <code className="bg-slate-100 text-purple-700 px-2 py-0.5 rounded font-mono text-xs">/school/createEvent</code>
+              Fill in the details below to create and publish a new event.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowJsonPreview(!showJsonPreview)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors"
-          >
-            <Code size={15} />
-            {showJsonPreview ? 'Hide Payload Spec' : 'Inspect Payload Schema'}
-          </button>
         </div>
-
-        {/* Payload Schema Inspector */}
-        {showJsonPreview && (
-          <div className="bg-slate-900 text-emerald-400 p-5 rounded-2xl shadow-xl font-mono text-xs overflow-x-auto space-y-2">
-            <div className="flex items-center justify-between text-slate-400 border-b border-slate-800 pb-2 mb-2">
-              <span className="font-semibold text-white flex items-center gap-2">
-                <Info size={14} className="text-cyan-400" />
-                FormData Parameters Preview
-              </span>
-              <span className="text-purple-400">multipart/form-data</span>
-            </div>
-            <pre className="text-slate-200">
-{JSON.stringify(
-  {
-    title: formData.title || '(required)',
-    description: formData.description || '(required)',
-    type: formData.type, // "physical" | "virtual"
-    audience: 'restricted',
-    startTime: formData.startTime || '(required ISO 8601)',
-    endTime: formData.endTime || '(required ISO 8601)',
-    size: formData.size || '(required capacity)',
-    priceType: formData.priceType, // "free" | "paid"
-    location: formData.location || '(required venue)',
-    ...(formData.priceType === 'paid' && {
-      price: formData.price || '(required for paid)',
-      currency: formData.currency || '(required for paid)'
-    }),
-    link: formData.link || undefined,
-    photo: formData.photo ? `[File: ${formData.photo.name}]` : undefined,
-    features: formData.features?.length ? JSON.stringify(formData.features) : undefined,
-    roadMap: formData.roadMap?.length ? JSON.stringify(formData.roadMap) : undefined,
-    agendas: formData.agendas?.length ? JSON.stringify(formData.agendas) : undefined,
-    contactInfo:
-      formData.contactInfo?.email || formData.contactInfo?.phone || formData.contactInfo?.address
-        ? JSON.stringify(formData.contactInfo)
-        : undefined
-  },
-  null,
-  2
-)}
-            </pre>
-          </div>
-        )}
 
         {/* Success View */}
         {createdEvent ? (
@@ -379,13 +453,8 @@ export default function CorporateEventsPage() {
             </div>
             <h2 className="text-2xl font-bold text-slate-800">Event Created Successfully!</h2>
             <p className="text-slate-600 text-sm max-w-md mx-auto">
-              Event <strong className="text-slate-800">&quot;{formData.title}&quot;</strong> has been published.
+              Event <strong className="text-slate-800">&quot;{formData.title}&quot;</strong> has been published and is now active.
             </p>
-
-            <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl max-w-lg mx-auto text-left text-xs font-mono text-slate-700 overflow-x-auto">
-              <p className="text-slate-500 font-bold mb-1">Server Response:</p>
-              <pre>{JSON.stringify(createdEvent, null, 2)}</pre>
-            </div>
 
             <div className="flex gap-3 justify-center pt-4">
               <button
@@ -400,15 +469,15 @@ export default function CorporateEventsPage() {
         ) : (
           /* Form */
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Mandatory Section 1: Core Details */}
+            {/* Section 1: Core Details */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                   <FileText size={18} className="text-purple-600" />
-                  Mandatory Event Information
+                  Event Details
                 </h2>
                 <span className="text-xs font-semibold text-rose-500 bg-rose-50 px-2.5 py-1 rounded-full">
-                  Required Fields
+                  Required
                 </span>
               </div>
 
@@ -455,7 +524,7 @@ export default function CorporateEventsPage() {
                     name="title"
                     value={formData.title}
                     onChange={handleInputChange}
-                    placeholder="e.g., Annual Health & Wellness Summit"
+                    placeholder="Enter event title"
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-sm text-slate-800"
                     required
                   />
@@ -470,7 +539,7 @@ export default function CorporateEventsPage() {
                     rows="3"
                     value={formData.description}
                     onChange={handleInputChange}
-                    placeholder="Detailed description of the event..."
+                    placeholder="Describe your event in detail..."
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-sm text-slate-800"
                     required
                   />
@@ -496,16 +565,23 @@ export default function CorporateEventsPage() {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Capacity Size (Slots) <span className="text-rose-500">*</span>
+                    Capacity / Max Slots <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <Users size={16} className="absolute left-3 top-3 text-slate-400" />
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       name="size"
                       value={formData.size}
-                      onChange={handleInputChange}
-                      placeholder="100"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "" || /^[0-9]+$/.test(val)) {
+                          handleInputChange({ target: { name: "size", value: val } });
+                        }
+                      }}
+                      placeholder="Max capacity (e.g., 100)"
                       className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-sm text-slate-800"
                       required
                     />
@@ -521,6 +597,7 @@ export default function CorporateEventsPage() {
                     name="startTime"
                     value={formData.startTime}
                     onChange={handleInputChange}
+                    min={nowLocal}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-sm text-slate-800"
                     required
                   />
@@ -535,6 +612,7 @@ export default function CorporateEventsPage() {
                     name="endTime"
                     value={formData.endTime}
                     onChange={handleInputChange}
+                    min={formData.startTime || nowLocal}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-sm text-slate-800"
                     required
                   />
@@ -553,8 +631,8 @@ export default function CorporateEventsPage() {
                       onChange={handleInputChange}
                       placeholder={
                         formData.type === 'physical'
-                          ? 'e.g., Main Auditorium, Building 4, Tech Park'
-                          : 'e.g., Virtual Zoom Meeting Room'
+                          ? 'Event venue / address'
+                          : 'Virtual meeting link or room name'
                       }
                       className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-sm text-slate-800"
                       required
@@ -564,7 +642,7 @@ export default function CorporateEventsPage() {
               </div>
             </div>
 
-            {/* Mandatory Section 2: Pricing Logic */}
+            {/* Section 2: Pricing Logic */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
               <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3">
                 <DollarSign size={18} className="text-purple-600" />
@@ -598,7 +676,7 @@ export default function CorporateEventsPage() {
                         name="price"
                         value={formData.price}
                         onChange={handleInputChange}
-                        placeholder="499"
+                        placeholder="Enter ticket price"
                         className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-sm text-slate-800"
                         required
                       />
@@ -626,12 +704,12 @@ export default function CorporateEventsPage() {
               </div>
             </div>
 
-            {/* Optional Section: Photo & Meeting Link */}
+            {/* Section 3: Photo & Link */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
               <h2 className="text-lg font-bold text-slate-800 flex items-center justify-between border-b border-slate-100 pb-3">
                 <span className="flex items-center gap-2">
                   <Upload size={18} className="text-purple-600" />
-                  Media & Optional Registration Link
+                  Media & Event Link
                 </span>
                 <span className="text-xs font-medium text-slate-400">Optional</span>
               </h2>
@@ -639,7 +717,7 @@ export default function CorporateEventsPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Event Join / Registration URL (`link`)
+                    Event Join / Registration Link <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <LinkIcon size={16} className="absolute left-3 top-3 text-slate-400" />
@@ -648,8 +726,9 @@ export default function CorporateEventsPage() {
                       name="link"
                       value={formData.link}
                       onChange={handleInputChange}
-                      placeholder="https://zoom.us/j/123456789"
+                      placeholder="https://example.com/event-registration"
                       className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-sm text-slate-800"
+                      required
                     />
                   </div>
                 </div>
@@ -659,7 +738,7 @@ export default function CorporateEventsPage() {
                     <label className="block border-2 border-dashed border-slate-300 hover:border-purple-500 bg-slate-50 hover:bg-purple-50/20 rounded-2xl p-5 text-center cursor-pointer transition-colors">
                       <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoChange} className="hidden" />
                       <Upload size={28} className="mx-auto text-purple-500 mb-1" />
-                      <p className="text-xs font-semibold text-slate-700">Upload Hero Image Banner (`photo` / `event` binary)</p>
+                      <p className="text-xs font-semibold text-slate-700">Upload Event Banner Image</p>
                       <p className="text-[10px] text-slate-400 mt-0.5">JPG or PNG image</p>
                     </label>
                   </div>
@@ -681,27 +760,27 @@ export default function CorporateEventsPage() {
               </div>
             </div>
 
-            {/* Optional Complex Fields: features, roadMap, agendas, contactInfo */}
+            {/* Section 4: Features, Roadmap & Agendas */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
               <h2 className="text-lg font-bold text-slate-800 flex items-center justify-between border-b border-slate-100 pb-3">
                 <span className="flex items-center gap-2">
                   <Layers size={18} className="text-purple-600" />
-                  Complex / Nested Data Arrays & Objects
+                  Features, Roadmap & Agendas
                 </span>
-                <span className="text-xs font-medium text-slate-400">Serialized JSON Strings</span>
+                <span className="text-xs font-medium text-slate-400">Optional</span>
               </h2>
 
               {/* features */}
               <div className="space-y-3">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  `features` (JSON String Array)
+                  Features
                 </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={newFeature}
                     onChange={(e) => setNewFeature(e.target.value)}
-                    placeholder="e.g. Lunch Provided"
+                    placeholder="e.g., Refreshments Provided"
                     className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
                   />
                   <button
@@ -712,18 +791,20 @@ export default function CorporateEventsPage() {
                     Add Feature
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="space-y-2">
                   {formData.features.map((feat, i) => (
-                    <span
-                      key={i}
-                      className="flex items-center gap-1.5 bg-purple-50 text-purple-800 border border-purple-200 px-3 py-1 rounded-xl text-xs"
-                    >
-                      <Tag size={12} className="text-purple-500" />
-                      {feat}
-                      <button type="button" onClick={() => removeFeature(i)} className="text-purple-400 hover:text-rose-600">
-                        <X size={12} />
+                    <div key={i} className="flex items-center gap-2">
+                      <Tag size={14} className="text-purple-500 flex-shrink-0" />
+                      <input
+                        type="text"
+                        value={feat}
+                        onChange={(e) => updateFeature(i, e.target.value)}
+                        className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-purple-500"
+                      />
+                      <button type="button" onClick={() => removeFeature(i)} className="text-slate-400 hover:text-rose-600 p-1">
+                        <Trash2 size={14} />
                       </button>
-                    </span>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -731,28 +812,28 @@ export default function CorporateEventsPage() {
               {/* roadMap */}
               <div className="space-y-3 pt-2">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  `roadMap` (JSON String Array of Steps)
+                  Roadmap / Timeline
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
                   <input
-                    type="text"
-                    placeholder="Title *"
-                    value={newRoadmap.title}
-                    onChange={(e) => setNewRoadmap({ ...newRoadmap, title: e.target.value })}
-                    className="px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Time (ISO / string)"
+                    type="datetime-local"
+                    min={nowLocal}
                     value={newRoadmap.time}
                     onChange={(e) => setNewRoadmap({ ...newRoadmap, time: e.target.value })}
                     className="px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none"
                   />
                   <input
                     type="text"
-                    placeholder="Time Taken (e.g. 30 mins)"
+                    placeholder="Duration (e.g., 30 mins)"
                     value={newRoadmap.timeTaken}
                     onChange={(e) => setNewRoadmap({ ...newRoadmap, timeTaken: e.target.value })}
+                    className="px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Title *"
+                    value={newRoadmap.title}
+                    onChange={(e) => setNewRoadmap({ ...newRoadmap, title: e.target.value })}
                     className="px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none"
                   />
                   <div className="flex gap-2">
@@ -773,16 +854,44 @@ export default function CorporateEventsPage() {
                   </div>
                 </div>
 
-                {formData.roadMap.map((step, idx) => (
-                  <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-start text-xs">
-                    <div>
-                      <span className="font-bold text-purple-700">Step {step.step}: {step.title}</span>
-                      {step.timeTaken && <span className="ml-2 text-slate-400 font-mono">({step.timeTaken})</span>}
-                      {step.description && <p className="text-slate-600 mt-0.5">{step.description}</p>}
+                {formData.roadMap.map((item, idx) => (
+                  <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-purple-700">Step {item.step || idx + 1}</span>
+                      <button type="button" onClick={() => removeRoadmap(idx)} className="text-slate-400 hover:text-rose-600">
+                        <Trash2 size={14} />
+                      </button>
                     </div>
-                    <button type="button" onClick={() => removeRoadmap(idx)} className="text-slate-400 hover:text-rose-600">
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <input
+                        type="datetime-local"
+                        min={nowLocal}
+                        value={item.time}
+                        onChange={(e) => updateRoadmap(idx, 'time', e.target.value)}
+                        className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Duration (e.g., 30 mins)"
+                        value={item.timeTaken}
+                        onChange={(e) => updateRoadmap(idx, 'timeTaken', e.target.value)}
+                        className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Title"
+                      value={item.title}
+                      onChange={(e) => updateRoadmap(idx, 'title', e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none font-semibold"
+                    />
+                    <textarea
+                      rows="2"
+                      placeholder="Description"
+                      value={item.description}
+                      onChange={(e) => updateRoadmap(idx, 'description', e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none"
+                    />
                   </div>
                 ))}
               </div>
@@ -790,12 +899,12 @@ export default function CorporateEventsPage() {
               {/* agendas */}
               <div className="space-y-3 pt-2">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  `agendas` (JSON String Array)
+                  Agendas / Schedule
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
                   <input
                     type="text"
-                    placeholder="Time (e.g. 10:30 AM)"
+                    placeholder="Time (e.g., 10:00 AM)"
                     value={newAgenda.time}
                     onChange={(e) => setNewAgenda({ ...newAgenda, time: e.target.value })}
                     className="px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none"
@@ -826,15 +935,36 @@ export default function CorporateEventsPage() {
                 </div>
 
                 {formData.agendas.map((item, idx) => (
-                  <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-start text-xs">
-                    <div>
-                      <span className="font-bold text-purple-700">{item.time || `Item ${idx + 1}`}: </span>
-                      <span className="font-semibold text-slate-800">{item.title}</span>
-                      {item.description && <p className="text-slate-600 mt-0.5">{item.description}</p>}
+                  <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-purple-700">Agenda {idx + 1}</span>
+                      <button type="button" onClick={() => removeAgenda(idx)} className="text-slate-400 hover:text-rose-600">
+                        <Trash2 size={14} />
+                      </button>
                     </div>
-                    <button type="button" onClick={() => removeAgenda(idx)} className="text-slate-400 hover:text-rose-600">
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Time (e.g., 10:00 AM)"
+                        value={item.time}
+                        onChange={(e) => updateAgenda(idx, 'time', e.target.value)}
+                        className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Title"
+                        value={item.title}
+                        onChange={(e) => updateAgenda(idx, 'title', e.target.value)}
+                        className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none font-semibold"
+                      />
+                    </div>
+                    <textarea
+                      rows="2"
+                      placeholder="Description"
+                      value={item.description}
+                      onChange={(e) => updateAgenda(idx, 'description', e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs outline-none"
+                    />
                   </div>
                 ))}
               </div>
@@ -842,7 +972,7 @@ export default function CorporateEventsPage() {
               {/* contactInfo */}
               <div className="space-y-3 pt-2">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  `contactInfo` (JSON String Object)
+                  Contact Information
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <input
@@ -850,7 +980,7 @@ export default function CorporateEventsPage() {
                     name="email"
                     value={formData.contactInfo.email}
                     onChange={handleContactChange}
-                    placeholder="email (e.g. events@example.com)"
+                    placeholder="Email (e.g., contact@example.com)"
                     className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
                   />
                   <input
@@ -858,7 +988,7 @@ export default function CorporateEventsPage() {
                     name="phone"
                     value={formData.contactInfo.phone}
                     onChange={handleContactChange}
-                    placeholder="phone (e.g. +919876543210)"
+                    placeholder="Phone (e.g., +91 9876543210)"
                     className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
                   />
                   <input
@@ -866,7 +996,7 @@ export default function CorporateEventsPage() {
                     name="address"
                     value={formData.contactInfo.address}
                     onChange={handleContactChange}
-                    placeholder="address (e.g. Building 4, Tech Park)"
+                    placeholder="Address (e.g., Tech Park)"
                     className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"
                   />
                 </div>
@@ -888,7 +1018,7 @@ export default function CorporateEventsPage() {
                 ) : (
                   <>
                     <Calendar size={18} />
-                    POST /school/createEvent
+                    Create Event
                   </>
                 )}
               </button>
