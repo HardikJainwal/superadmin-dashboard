@@ -72,7 +72,7 @@ const menuItems = [
       { id: 'corporate-community', label: 'Corporate Community', icon: Users, href: '/dashboard/corporate-community' },
       { id: 'role-permissions', label: 'Role Permissions', icon: ShieldCheck, href: '/dashboard/role-permissions' },
       { id: 'corporate-resources', label: 'Resources', icon: FileText, href: '/dashboard/corporate-resources' },
-      { id: 'corporate-events', label: 'Create Event', icon: Calendar, href: '/dashboard/corporate-events' },
+      { id: 'corporate-events', label: 'Events', icon: Calendar, href: '/dashboard/corporate-events' },
       { id: 'corporate-coach-assign', label: 'Coach Assignment', icon: Stethoscope, href: '/dashboard/corporate-coach-assign' },
     ]
   },
