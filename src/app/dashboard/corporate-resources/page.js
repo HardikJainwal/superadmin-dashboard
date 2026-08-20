@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 
 const API_URL = 'https://api.humanova.live/api/v1/superAdmin/resource/admin';
+const API_POST_URL = 'https://api.humanova.live/api/v1/superAdmin/resource';
 const API_BASE = 'https://api.humanova.live/api/v1';
 
 // Google Drive & General Image URL Helper
@@ -309,7 +310,7 @@ const ResourceAdminPanel = () => {
     }
 
     try {
-      const response = await fetch(API_URL, {
+      const response = await fetch(API_POST_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
